@@ -7,7 +7,7 @@ Stable tag: 0.2
 
 == Description ==
 
-This plugin converts Arabic characters in post slugs to Latin characters. Very useful for Arab-speaking users of WordPress. You can use this plugin for creating human-readable links. Send your suggestions and critics to <a href="mailto:cf@5vlast.ru">cf@5vlast.ru</a> <a href="http://www.5vlast.ru">Продвижение сайтов в казани</a>.
+This plugin converts Arabic characters in post slugs to Latin characters. Very useful for Arab-speaking users of WordPress. You can use this plugin for creating human-readable links. Send your suggestions and critics to me :)).
 
 = Features =
 * converts new post, page, custom post slugs from arabic letter to English lat letters 
