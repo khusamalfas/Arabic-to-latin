@@ -170,6 +170,9 @@ GPL-2.0-or-later. See [LICENSE](LICENSE).
 
 ## Credits
 
-Written and maintained by [Khusam Alfas](https://profiles.wordpress.org/5vlast/). It is a personal
-project and not a product of his employer; support goes through the
+Written and maintained by [Khusam Alfas](https://profiles.wordpress.org/5vlast/), who works at
+SEO Revolution, [WordPress Agentur in Berlin](https://seo-revolution.com/wordpress-agentur-berlin/).
+
+Arabic to Latin is a personal project. It is not a SEO Revolution product, and SEO Revolution does
+not provide support for it. Support goes through the
 [wordpress.org forum](https://wordpress.org/support/plugin/arabic-to-lat/) and this repository.
