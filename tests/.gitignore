@@ -1,0 +1,4 @@
+.cache/
+.site-*/
+.results*.jsonl
+.server*.log

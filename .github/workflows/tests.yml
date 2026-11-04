@@ -1,0 +1,136 @@
+name: Tests
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+  schedule:
+    # Monday 06:00 UTC: catches a new WordPress release breaking the plugin
+    # even when nobody has pushed anything.
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Lint PHP ${{ matrix.php }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ['7.4', '8.4']
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          coverage: none
+
+      - name: Syntax-check every plugin file
+        run: |
+          set -euo pipefail
+          find arabic-to-lat -name '*.php' -print0 | xargs -0 -n1 -P4 php -l
+
+  scenarios:
+    name: ${{ matrix.name }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # The main run: newest WordPress, newest PHP, intl available.
+          - name: WP latest · PHP 8.4 · intl
+            wp: latest
+            php: '8.4'
+            ext: 'gd, zip, sqlite3, pdo_sqlite, mbstring, curl, intl'
+          # Shared hosting without the intl extension: the transliterator has
+          # its own normalisation fallback, and this is what proves it.
+          - name: WP latest · PHP 8.4 · no intl
+            wp: latest
+            php: '8.4'
+            ext: 'gd, zip, sqlite3, pdo_sqlite, mbstring, curl, :intl'
+          # The minimum PHP the plugin header claims.
+          - name: WP latest · PHP 7.4 · no intl
+            wp: latest
+            php: '7.4'
+            ext: 'gd, zip, sqlite3, pdo_sqlite, mbstring, curl, :intl'
+          # The minimum WordPress the plugin header claims.
+          - name: WP 6.4 · PHP 8.1 · intl
+            wp: '6.4'
+            php: '8.1'
+            ext: 'gd, zip, sqlite3, pdo_sqlite, mbstring, curl, intl'
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up PHP ${{ matrix.php }}
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: ${{ matrix.ext }}
+          ini-values: memory_limit=512M
+          coverage: none
+
+      - name: Install WP-CLI
+        run: |
+          set -euo pipefail
+          curl -fsSL -o /usr/local/bin/wp \
+            https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar
+          chmod +x /usr/local/bin/wp
+          wp --info
+
+      - name: Report the environment under test
+        run: |
+          php -v
+          php -r 'echo "intl: ", extension_loaded("intl") ? "yes" : "no", PHP_EOL;'
+          php -r 'echo "SQLite: ", (new PDO("sqlite::memory:"))->query("select sqlite_version()")->fetchColumn(), PHP_EOL;'
+
+      - name: Stamp the current week for the cache key
+        id: week
+        run: echo "v=$(date -u +%G-W%V)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache the wordpress.org plugin downloads
+        uses: actions/cache@v4
+        with:
+          path: tests/.cache
+          # Rotates weekly, so "latest" WooCommerce/Polylang are re-fetched
+          # instead of being pinned forever by a stale cache.
+          key: wporg-zips-${{ runner.os }}-${{ matrix.wp }}-${{ steps.week.outputs.v }}
+          restore-keys: wporg-zips-${{ runner.os }}-${{ matrix.wp }}-
+
+      - name: Run the scenario suites
+        env:
+          ATL_TEST_PORT: '8890'
+        run: tests/run.sh --wp=${{ matrix.wp }}
+
+      - name: Upload results and server log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: results-${{ strategy.job-index }}
+          path: |
+            tests/.results*.jsonl
+            tests/.server*.log
+          retention-days: 7
+          if-no-files-found: ignore
+
+  plugin-check:
+    name: WordPress Plugin Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Run Plugin Check
+        uses: WordPress/plugin-check-action@v1.1.9
+        with:
+          build-dir: ./arabic-to-lat

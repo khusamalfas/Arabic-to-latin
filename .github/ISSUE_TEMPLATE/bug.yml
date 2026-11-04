@@ -1,0 +1,51 @@
+name: Bug report
+description: Something does not work.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Usage questions belong in the [support forum](https://wordpress.org/support/plugin/arabic-to-lat/).
+        Security problems must be reported privately — see SECURITY.md.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Settings → Permalinks is set to ...
+        2. New post, title "..."
+        3. Publish
+        4. The slug is ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected instead
+    validations:
+      required: true
+  - type: input
+    id: versions
+    attributes:
+      label: Plugin, WordPress, PHP and database versions
+      placeholder: "1.0.0, WP 6.8.1, PHP 8.2, MySQL 8.0"
+    validations:
+      required: true
+  - type: textarea
+    id: env
+    attributes:
+      label: Editor, multilingual plugin and other plugins involved
+      placeholder: "Block editor, WPML 4.9.7, WooCommerce 11.3"
+  - type: checkboxes
+    id: isolated
+    attributes:
+      label: Checked
+      options:
+        - label: It still happens with other plugins deactivated and a default theme, or I said above why I could not test that.
+        - label: The site is not running a version below 1.0.0.

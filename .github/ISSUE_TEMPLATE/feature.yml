@@ -1,0 +1,29 @@
+name: Feature or spelling style
+description: Suggest something the plugin should do.
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem you have
+      description: What are you trying to publish, and what gets in the way? Describe the situation, not the solution.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What you would like the plugin to do
+    validations:
+      required: true
+  - type: input
+    id: audience
+    attributes:
+      label: Language, country or audience this is for
+      placeholder: "Moroccan Darija sites, French-style spelling"
+  - type: checkboxes
+    id: constraints
+    attributes:
+      label: Checked
+      options:
+        - label: It does not change the slugs existing sites already produced.
+        - label: It does not need an external service or an API key to work.

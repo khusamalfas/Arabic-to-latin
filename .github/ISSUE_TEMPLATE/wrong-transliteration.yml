@@ -1,0 +1,47 @@
+name: Wrong transliteration
+description: A letter, word or file name comes out wrong.
+labels: ["transliteration"]
+body:
+  - type: input
+    id: input
+    attributes:
+      label: Input
+      description: The exact title, term name or file name, as text (not a screenshot).
+      placeholder: مرحبا بالعالم
+    validations:
+      required: true
+  - type: input
+    id: got
+    attributes:
+      label: Slug the plugin produced
+      placeholder: mrhba-balaalm
+    validations:
+      required: true
+  - type: input
+    id: expected
+    attributes:
+      label: Slug you expected
+      placeholder: marhaba-bilalam
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why
+      description: A standard, a regional spelling, common usage. "I prefer it" is not enough to change the default table, but it is a good reason for a new spelling style.
+    validations:
+      required: true
+  - type: dropdown
+    id: style
+    attributes:
+      label: Spelling style in Settings → Arabic to Latin
+      options: ["Standard", "Egyptian", "Maghreb / French", "Arabizi / Franco-Arabic", "I don't know"]
+    validations:
+      required: true
+  - type: input
+    id: versions
+    attributes:
+      label: Plugin, WordPress and PHP versions
+      placeholder: "1.0.0, WP 6.8.1, PHP 8.2, intl active"
+    validations:
+      required: true

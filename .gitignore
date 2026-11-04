@@ -1,0 +1,10 @@
+.DS_Store
+node_modules/
+vendor/
+*.zip
+
+# Test scratch: fresh sites, downloaded plugin zips, logs and results.
+tests/.cache/
+tests/.site-*/
+tests/.results*.jsonl
+tests/.server*.log

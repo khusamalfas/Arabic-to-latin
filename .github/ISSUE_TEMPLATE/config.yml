@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Usage question or support
+    url: https://wordpress.org/support/plugin/arabic-to-lat/
+    about: Questions about using the plugin are answered in the WordPress.org support forum.
+  - name: Security problem
+    url: https://github.com/khusamalfas/Arabic-to-latin/security/advisories/new
+    about: Please report security problems privately, never as a public issue.
+  - name: Translate the plugin
+    url: https://translate.wordpress.org/projects/wp-plugins/arabic-to-lat/
+    about: Translations go through translate.wordpress.org, not pull requests.
