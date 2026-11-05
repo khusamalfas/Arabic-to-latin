@@ -35,6 +35,12 @@ final class Transliterator {
 	const VOWEL_I = "\u{E001}";
 
 	/**
+	 * Marker for a final ه read as the vowel e rather than the consonant h,
+	 * which is how Persian writes it: خانه is khane, not khanh.
+	 */
+	const VOWEL_E = "\u{E002}";
+
+	/**
 	 * Single-character map applied after the context rules.
 	 *
 	 * @var array<string,string>
@@ -55,8 +61,9 @@ final class Transliterator {
 	 * @var array<string,bool>
 	 */
 	private $rules = array(
-		'waw' => true,
-		'yaa' => true,
+		'waw'      => true,
+		'yaa'      => true,
+		'he_final' => false,
 	);
 
 	/**
@@ -65,7 +72,13 @@ final class Transliterator {
 	 */
 	public function __construct( array $custom = array(), $preset = 'standard' ) {
 		$presets = self::presets();
-		$table   = array_merge( self::default_table(), isset( $presets[ $preset ] ) ? $presets[ $preset ]['table'] : array() );
+		$chosen  = isset( $presets[ $preset ] ) ? $presets[ $preset ] : array( 'table' => array() );
+		$table   = array_merge( self::default_table(), $chosen['table'] );
+
+		// A preset may also switch a context rule on, which a letter table cannot express.
+		if ( ! empty( $chosen['rules'] ) ) {
+			$this->rules = array_merge( $this->rules, $chosen['rules'] );
+		}
 
 		foreach ( $custom as $from => $to ) {
 			$from = (string) $from;
@@ -81,6 +94,8 @@ final class Transliterator {
 				$this->rules['waw'] = false;
 			} elseif ( 'ي' === $from || 'ی' === $from ) {
 				$this->rules['yaa'] = false;
+			} elseif ( 'ه' === $from ) {
+				$this->rules['he_final'] = false;
 			}
 		}
 
@@ -135,6 +150,7 @@ final class Transliterator {
 			array(
 				self::VOWEL_U => 'u',
 				self::VOWEL_I => 'i',
+				self::VOWEL_E => 'e',
 			)
 		);
 	}
@@ -171,6 +187,20 @@ final class Transliterator {
 		if ( $this->rules['waw'] ) {
 			// Inside or at the end of a word and not followed by a vowel, waw is the vowel u.
 			$text = preg_replace( '/(?<=' . $letter . '|[\x{064B}-\x{0652}])\x{0648}(?!' . $vowel_next . ')/u', self::VOWEL_U, $text );
+		}
+
+		if ( $this->rules['he_final'] ) {
+			/*
+			 * Persian: a word-final ه is the vowel e (خانه → khane, نامه → name).
+			 * After a long vowel it stays a consonant and keeps its h
+			 * (ماه → mah, راه → rah, گناه → gonah), so alef, waw and the
+			 * long-vowel markers are excluded.
+			 */
+			$text = preg_replace(
+				'/(?<=' . $letter . ')(?<![\x{0622}-\x{0627}\x{0648}' . self::VOWEL_U . self::VOWEL_I . '])\x{0647}(?!' . $letter . ')/u',
+				self::VOWEL_E,
+				$text
+			);
 		}
 
 		return $text;
@@ -263,6 +293,23 @@ final class Transliterator {
 					'ح' => '7',
 				),
 			),
+			'persian'  => array(
+				/*
+				 * Persian reads the Arabic-only letters with Persian sounds, and
+				 * واو is the consonant v, not w. See issue #1 on GitHub: the
+				 * default table is an Arabic reading and gets these wrong.
+				 */
+				'table' => array(
+					'و' => 'v',
+					'ث' => 's',
+					'ذ' => 'z',
+					'ض' => 'z',
+					'ق' => 'gh',
+				),
+				'rules' => array(
+					'he_final' => true,
+				),
+			),
 		);
 	}
 
@@ -275,6 +322,7 @@ final class Transliterator {
 			'egyptian' => __( 'Egyptian', 'arabic-to-lat' ),
 			'maghreb'  => __( 'Maghreb (French spelling)', 'arabic-to-lat' ),
 			'arabizi'  => __( 'Franco-Arabic / Arabizi (chat numbers)', 'arabic-to-lat' ),
+			'persian'  => __( 'Persian (Farsi) spelling', 'arabic-to-lat' ),
 		);
 	}
 
@@ -326,6 +374,7 @@ final class Transliterator {
 			'ي' => 'y',
 			self::VOWEL_U => 'u',
 			self::VOWEL_I => 'i',
+			self::VOWEL_E => 'e',
 
 			// Persian, Urdu, Kurdish and Maghrebi letters.
 			'پ' => 'p',

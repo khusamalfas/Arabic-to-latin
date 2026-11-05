@@ -4,7 +4,7 @@ Tags: arabic, slug, permalink, transliteration, persian
 Requires at least: 6.4
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 1.0.0
+Stable tag: 1.1.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -32,7 +32,7 @@ It works automatically for every new post, page, product, category, tag and uplo
 * **Supports Arabic, Persian (Farsi), Urdu, Kurdish and Maghrebi letters**, Arabic-Indic and Persian digits (٢٠٢٦ → 2026) and diacritics (مُحَمَّد → muhammad).
 * **Handles text pasted from PDFs and Word**: Arabic letter shapes and ligatures such as ﻻ and ﷲ are read as ordinary letters, also on servers without the PHP intl extension.
 * **Readable results**: و and ي become the vowels u and i inside words, so سعيد becomes *said*, not *sayd*, and يوسف becomes *yusf*.
-* **Regional spelling styles**: Standard, Egyptian (جمال → *gmal*), Maghreb / French (شكور → *chkour*, وجدة → *oujda*) or Franco-Arabic / Arabizi chat numbers (حبيبي → *7bibi*).
+* **Regional spelling styles**: Standard, Egyptian (جمال → *gmal*), Maghreb / French (شكور → *chkour*, وجدة → *oujda*), Franco-Arabic / Arabizi chat numbers (حبيبي → *7bibi*) or **Persian (Farsi)**, which reads the letters the Persian way: خانه → *khane* not *khanh*, وردپرس → *vrdprs*, قیمت → *ghimt*, while ماه stays *mah*.
 * **Editable table**: override any letter, for example ع = 3 for Franco-Arabic (Arabizi) style, or whole words (محمد = mohammed) from the settings page.
 * **Latin slug preview in the block editor** while you type the title, before the first save.
 * **Converts existing Arabic slugs on request**: preview first, choose post types and taxonomies, and follow a progress bar; any number of posts, no timeouts. Old URLs keep working: they redirect (301) to the new ones, for posts, pages, categories and tags.
@@ -168,6 +168,11 @@ No. Your existing slugs stay as they are and the `atl_table` filter still works.
 3. A Latin slug generated in the block editor from an Arabic title.
 
 == Changelog ==
+
+= 1.1.0 =
+* New: a **Persian (Farsi) spelling style**. The default table reads the letters as an Arabic speaker would, which is wrong for Persian: خانه became *khanh* instead of *khane*, وردپرس became *wrdprs* instead of *vrdprs*, and قیمت became *qimt* instead of *ghimt*. The new style fixes those, and keeps the h where Persian keeps it: ماه is still *mah*, دانشگاه still *danshgah*.
+* The Standard style and every Arabic slug it produces are unchanged, so no existing site's URLs move. The Persian style is opt-in, in Settings → Arabic to Latin.
+* Known limit: short vowels are still not written, so مشهد is *mshhd*, not *mashhad*. A letter table cannot supply vowels that the script does not write. Reports from Persian speakers are welcome on GitHub.
 
 = 1.0.0 =
 * Rewritten and tested with WordPress 6.4 – 7.1 and PHP 7.4 – 8.4 (with and without the intl extension).

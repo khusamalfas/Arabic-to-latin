@@ -74,6 +74,7 @@ Every row is an action or input a real site can produce, the behaviour we promis
 | E1 | Custom replacements with junk lines, Latin keys, uppercase / symbols in values | Junk ignored, values cleaned to `a-z0-9-` | 2×3=6 | `settings.php` | ✅ |
 | E2 | Replacement with empty value (`ء =`) | Letter removed | 1×2=2 | `settings.php` | ✅ |
 | E3 | Change spelling style after content exists | Only new slugs change | 4×3=12 | `settings.php` | ✅ |
+| E3 | Persian spelling style | Final ه is the vowel *e* (خانه → khane) but stays *h* after a long vowel (ماه → mah); و → v, ق → gh, ذ/ث/ض read the Persian way; the Standard style and all Arabic output are untouched; a custom ه beats the rule | 9 | `settings.php` | ✅ |
 | E4 | Convert twice | Second run converts 0 (idempotent) | 3×3=9 | `converter.php` | ✅ |
 | E5 | Convert without the backup tick (no JavaScript) | Refused | 3×2=6 | `security.php` | ✅ |
 | E6 | Editor / author role opens the converter, calls the batch AJAX | Denied (403) | 4×2=8 | `security.php` | ✅ |
