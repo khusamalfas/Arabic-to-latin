@@ -149,6 +149,12 @@ final class Admin {
 			wp_safe_redirect( add_query_arg( 'arabic_to_lat_error', 'backup', $this->page_url() ) );
 			exit;
 		}
+		// Re-conversion rewrites URLs that currently work, so it takes its own
+		// confirmation on top of the backup one.
+		if ( ! $dry_run && ! empty( $_POST['arabic_to_lat_reconvert'] ) && empty( $_POST['arabic_to_lat_reconvert_confirm'] ) ) {
+			wp_safe_redirect( add_query_arg( 'arabic_to_lat_error', 'reconvert', $this->page_url() ) . '#atl-reconvert' );
+			exit;
+		}
 
 		$result = $this->scoped_converter()->run(
 			array(
@@ -233,6 +239,9 @@ final class Admin {
 			$converter->scope( $post_types, $taxonomies );
 			$this->scope = array_merge( $post_types, $taxonomies );
 		}
+		if ( ! empty( $_POST['arabic_to_lat_reconvert'] ) ) {
+			$converter->reconvert();
+		}
 		// phpcs:enable
 		return $converter;
 	}
@@ -272,6 +281,8 @@ final class Admin {
 				'resultUrl' => add_query_arg( 'arabic_to_lat_result', 1, $this->page_url() ) . '#atl-existing',
 				/* translators: 1: slugs converted so far, 2: slugs found */
 				'progress'  => __( 'Converting… %1$d of %2$d', 'arabic-to-lat' ),
+				/* translators: %1$d: slugs changed so far. Used when the total is not known in advance. */
+				'scanning'  => __( 'Checking slugs… %1$d changed so far', 'arabic-to-lat' ),
 				'error'     => __( 'The conversion stopped because of an error. Slugs converted so far are saved; run it again to continue.', 'arabic-to-lat' ),
 			)
 		);
@@ -405,13 +416,16 @@ final class Admin {
 			<?php if ( 'backup' === $error ) : ?>
 				<div class="notice notice-error inline"><p><?php esc_html_e( 'Please confirm that you have a database backup.', 'arabic-to-lat' ); ?></p></div>
 			<?php endif; ?>
+			<?php if ( 'reconvert' === $error ) : ?>
+				<div class="notice notice-error inline"><p><?php esc_html_e( 'Please confirm that you understand these URLs change.', 'arabic-to-lat' ); ?></p></div>
+			<?php endif; ?>
 
 			<?php if ( $result ) : ?>
 				<?php $this->render_result( $result ); ?>
 			<?php endif; ?>
 
 			<?php if ( $counts['posts'] || $counts['terms'] ) : ?>
-				<form id="atl-convert-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+				<form id="atl-convert-form" class="atl-convert-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
 					<input type="hidden" name="action" value="arabic_to_lat_convert">
 					<input type="hidden" name="arabic_to_lat_scope" value="1">
 					<?php wp_nonce_field( 'arabic_to_lat_convert' ); ?>
@@ -446,6 +460,66 @@ final class Admin {
 					</p>
 				</form>
 			<?php endif; ?>
+
+			<h2 id="atl-reconvert"><?php esc_html_e( 'Slugs this plugin already converted', 'arabic-to-lat' ); ?></h2>
+			<p><?php esc_html_e( 'If you change the spelling style, slugs created earlier keep the spelling they already have. That is deliberate: they are working URLs. This is the separate, optional step that brings them in line with the style you use now.', 'arabic-to-lat' ); ?></p>
+			<div class="notice notice-warning inline">
+				<p><strong><?php esc_html_e( 'Read this before using it.', 'arabic-to-lat' ); ?></strong></p>
+				<ul style="list-style:disc;margin-left:2em">
+					<li><?php esc_html_e( 'Every URL it changes currently works. Old URLs are redirected (301) to the new ones, but a redirect is not free: search engines take time to follow it, and links outside your site are not updated.', 'arabic-to-lat' ); ?></li>
+					<li><?php esc_html_e( 'Only slugs this plugin produced are touched. A slug you typed yourself is recognised and left alone.', 'arabic-to-lat' ); ?></li>
+					<li><?php esc_html_e( 'Uploaded files are never renamed: there is no redirect for a file, so every embed and hotlink to it would break.', 'arabic-to-lat' ); ?></li>
+					<li><?php esc_html_e( 'If you sell through WooCommerce, product URLs may be in feeds and marketplace listings that a redirect does not repair.', 'arabic-to-lat' ); ?></li>
+					<li><?php esc_html_e( 'Preview first. The preview lists every URL that would change.', 'arabic-to-lat' ); ?></li>
+				</ul>
+			</div>
+			<form id="atl-reconvert-form" class="atl-convert-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+				<input type="hidden" name="action" value="arabic_to_lat_convert">
+				<input type="hidden" name="arabic_to_lat_scope" value="1">
+				<input type="hidden" name="arabic_to_lat_reconvert" value="1">
+				<?php wp_nonce_field( 'arabic_to_lat_convert' ); ?>
+				<fieldset>
+					<legend><strong><?php esc_html_e( 'Re-convert slugs of', 'arabic-to-lat' ); ?></strong></legend>
+					<?php
+					$reconvert_types = array(
+						'arabic_to_lat_post_types' => array_diff( Converter::post_types(), array( 'attachment' ) ),
+						'arabic_to_lat_taxonomies' => Converter::taxonomies(),
+					);
+					foreach ( $reconvert_types as $field => $names ) :
+						foreach ( $names as $name ) :
+							$object = 'arabic_to_lat_post_types' === $field ? get_post_type_object( $name ) : get_taxonomy( $name );
+							$label  = $object ? $object->labels->name : $name;
+							?>
+							<label style="display:inline-block;margin:4px 16px 4px 0">
+								<input type="checkbox" name="<?php echo esc_attr( $field ); ?>[]" value="<?php echo esc_attr( $name ); ?>">
+								<?php echo esc_html( $label ); ?>
+							</label>
+							<?php
+						endforeach;
+					endforeach;
+					?>
+				</fieldset>
+				<p>
+					<button type="submit" name="arabic_to_lat_preview" value="1" class="button" formnovalidate><?php esc_html_e( 'Preview changes', 'arabic-to-lat' ); ?></button>
+				</p>
+				<p>
+					<label>
+						<input type="checkbox" name="arabic_to_lat_backup" value="1" required>
+						<?php esc_html_e( 'I have a current database backup.', 'arabic-to-lat' ); ?>
+					</label>
+				</p>
+				<p>
+					<label>
+						<input type="checkbox" name="arabic_to_lat_reconvert_confirm" value="1" required>
+						<?php esc_html_e( 'I understand these URLs work today and will change.', 'arabic-to-lat' ); ?>
+					</label>
+				</p>
+				<button type="submit" name="arabic_to_lat_apply" value="1" class="button"><?php esc_html_e( 'Re-convert these slugs', 'arabic-to-lat' ); ?></button>
+				<p class="atl-progress" hidden>
+					<progress max="1" value="0" style="width:100%;max-width:30em"></progress><br>
+					<span class="atl-progress-status" role="status" aria-live="polite"></span>
+				</p>
+			</form>
 
 			<h2><?php esc_html_e( 'Default table', 'arabic-to-lat' ); ?></h2>
 			<details>

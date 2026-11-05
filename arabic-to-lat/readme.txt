@@ -170,6 +170,7 @@ No. Your existing slugs stay as they are and the `atl_table` filter still works.
 == Changelog ==
 
 = 1.1.0 =
+* New: **re-convert slugs the plugin already converted**, for sites that change spelling style. It is a separate, optional step on the settings page, off by default, with a preview and two confirmations, and old URLs are redirected (301) to the new ones. Only slugs this plugin produced are touched: a slug you typed yourself is recognised and left alone. Uploaded files are never renamed, because there is no redirect for a file. Also available as `wp arabic-to-lat convert --reconvert`.
 * New: a **Persian (Farsi) spelling style**. The default table reads the letters as an Arabic speaker would, which is wrong for Persian: خانه became *khanh* instead of *khane*, وردپرس became *wrdprs* instead of *vrdprs*, and قیمت became *qimt* instead of *ghimt*. The new style fixes those, and keeps the h where Persian keeps it: ماه is still *mah*, دانشگاه still *danshgah*.
 * The Standard style and every Arabic slug it produces are unchanged, so no existing site's URLs move. The Persian style is opt-in, in Settings → Arabic to Latin.
 * Known limit: short vowels are still not written, so مشهد is *mshhd*, not *mashhad*. A letter table cannot supply vowels that the script does not write. Reports from Persian speakers are welcome on GitHub.

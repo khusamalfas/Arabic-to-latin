@@ -36,6 +36,11 @@ final class CLI {
 	 * [--taxonomy=<taxonomies>]
 	 * : Comma-separated taxonomies to convert, e.g. category. Default: all public ones except WooCommerce attributes.
 	 *
+	 * [--reconvert]
+	 * : Also rewrite slugs this plugin already converted, using the current spelling style.
+	 *   Only slugs the plugin produced are touched; a hand-written slug is left alone, and
+	 *   uploaded files are never renamed. Old URLs 301 to the new ones. Preview with --dry-run first.
+	 *
 	 * [--format=<format>]
 	 * : Output format.
 	 * ---
@@ -52,6 +57,7 @@ final class CLI {
 	 *     wp arabic-to-lat convert --dry-run
 	 *     wp arabic-to-lat convert --posts-only
 	 *     wp arabic-to-lat convert --post_type=product --taxonomy=product_cat
+	 *     wp arabic-to-lat convert --reconvert --dry-run
 	 *
 	 * @param array $args       Positional arguments.
 	 * @param array $assoc_args Named arguments.
@@ -66,6 +72,9 @@ final class CLI {
 		$post_types = isset( $assoc_args['post_type'] ) ? array_filter( array_map( 'trim', explode( ',', $assoc_args['post_type'] ) ) ) : ( $named ? array() : null );
 		$taxonomies = isset( $assoc_args['taxonomy'] ) ? array_filter( array_map( 'trim', explode( ',', $assoc_args['taxonomy'] ) ) ) : ( $named ? array() : null );
 		$converter->scope( $post_types, $taxonomies );
+		if ( \WP_CLI\Utils\get_flag_value( $assoc_args, 'reconvert', false ) ) {
+			$converter->reconvert();
+		}
 		$result = $converter->run(
 			array(
 				'dry_run' => $dry_run,

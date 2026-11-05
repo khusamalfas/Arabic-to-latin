@@ -31,6 +31,14 @@ t_check( 'E6', 'Nothing converted', get_post( $legacy )->post_name, $slug );
 
 // E7: admin without a valid nonce.
 $admin = t_login( 1 );
+// The settings page is rendered by PHP that no other test executes: a fatal in
+// its markup would otherwise ship unnoticed.
+$r = t_http( 'wp-admin/options-general.php?page=arabic-to-lat', array( 'cookies' => $admin ) );
+t_check( 'E5', 'Admin: settings page renders', $r['code'], 200 );
+t_true( 'E5', 'Admin: converter section present', false !== strpos( $r['body'], 'id="atl-existing"' ), substr( $r['body'], 0, 120 ) );
+t_true( 'E5', 'Admin: re-conversion section present', false !== strpos( $r['body'], 'id="atl-reconvert"' ), substr( $r['body'], 0, 120 ) );
+t_true( 'E5', 'Admin: re-conversion needs its own confirmation', false !== strpos( $r['body'], 'arabic_to_lat_reconvert_confirm' ), substr( $r['body'], 0, 120 ) );
+t_true( 'E5', 'Admin: no PHP notice in the page', false === stripos( $r['body'], 'Fatal error' ) && false === stripos( $r['body'], 'Warning:' ), substr( $r['body'], 0, 200 ) );
 $r = t_http( 'wp-admin/admin-ajax.php', array( 'method' => 'POST', 'cookies' => $admin, 'body' => array( 'action' => 'arabic_to_lat_convert_batch', '_wpnonce' => 'invalid' ) ) );
 t_check( 'E7', 'Batch AJAX with a bad nonce denied', $r['code'], 403 );
 $r = t_http( 'wp-admin/admin-post.php', array( 'method' => 'POST', 'cookies' => $admin, 'body' => array( 'action' => 'arabic_to_lat_convert', 'arabic_to_lat_apply' => '1', 'arabic_to_lat_backup' => '1' ) ) );

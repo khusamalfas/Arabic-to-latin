@@ -7,8 +7,9 @@
 	'use strict';
 
 	var settings = window.arabicToLatConvert;
-	var form = document.getElementById( 'atl-convert-form' );
-	if ( ! settings || ! form || ! window.fetch || ! window.FormData ) {
+	// Two forms use this: the Arabic-slug converter and the re-conversion one.
+	var forms = document.querySelectorAll( 'form.atl-convert-form' );
+	if ( ! settings || ! forms.length || ! window.fetch || ! window.FormData ) {
 		return;
 	}
 
@@ -16,11 +17,17 @@
 		return template.replace( '%1$d', done ).replace( '%2$d', total );
 	}
 
+	Array.prototype.forEach.call( forms, function ( form ) {
 	form.addEventListener( 'submit', function ( event ) {
 		var submitter = event.submitter || document.activeElement;
 		var backup = form.querySelector( '[name="arabic_to_lat_backup"]' );
+		// The re-conversion form has a second, separate confirmation.
+		var understood = form.querySelector( '[name="arabic_to_lat_reconvert_confirm"]' );
 		// Preview keeps the normal form post; only the conversion runs in batches.
 		if ( ! submitter || 'arabic_to_lat_apply' !== submitter.name || ! backup || ! backup.checked ) {
+			return;
+		}
+		if ( understood && ! understood.checked ) {
 			return;
 		}
 		event.preventDefault();
@@ -38,10 +45,18 @@
 		var cursor = { posts: 0, terms: 0 };
 		var converted = 0;
 
+		// Re-conversion has no count to aim at: every row is checked and only
+		// some of them change, so the bar runs indeterminate and the text counts
+		// the changes instead of pretending to know the total.
+		var counting = 0 === total;
+
 		wrap.hidden = false;
 		bar.max = Math.max( total, 1 );
+		if ( counting ) {
+			bar.removeAttribute( 'value' );
+		}
 		button.disabled = true;
-		status.textContent = format( settings.progress, 0, total );
+		status.textContent = counting ? format( settings.scanning, 0, 0 ) : format( settings.progress, 0, total );
 
 		function batch() {
 			var data = new FormData();
@@ -50,6 +65,9 @@
 			data.append( 'cursor_posts', cursor.posts );
 			data.append( 'cursor_terms', cursor.terms );
 			data.append( 'arabic_to_lat_scope', '1' );
+			if ( form.querySelector( '[name="arabic_to_lat_reconvert"]' ) ) {
+				data.append( 'arabic_to_lat_reconvert', '1' );
+			}
 			Array.prototype.forEach.call( scope, function ( box ) {
 				data.append( box.name, box.value );
 			} );
@@ -64,8 +82,12 @@
 					}
 					converted += response.data.converted;
 					cursor = response.data.cursor;
-					bar.value = Math.min( converted, total );
-					status.textContent = format( settings.progress, converted, total );
+					if ( counting ) {
+						status.textContent = format( settings.scanning, converted, converted );
+					} else {
+						bar.value = Math.min( converted, total );
+						status.textContent = format( settings.progress, converted, total );
+					}
 					if ( response.data.done ) {
 						// A fresh query value forces a reload even when the page is already on the result URL.
 						var url = new URL( settings.resultUrl, window.location.href );
@@ -82,5 +104,6 @@
 		}
 
 		batch();
+	} );
 	} );
 }() );
