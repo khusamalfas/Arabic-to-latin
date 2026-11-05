@@ -3,7 +3,7 @@
  * Plugin Name:       Arabic to Latin – Arabic Slugs & Permalinks in English Letters
  * Plugin URI:        https://wordpress.org/plugins/arabic-to-lat/
  * Description:       Converts Arabic, Persian and Urdu characters in post, page, product and term slugs and in uploaded file names to readable Latin (English) letters. Works with WPML, Polylang, TranslatePress, WooCommerce and the block editor.
- * Version:           1.0.0
+ * Version:           1.1.0
  * Requires at least: 6.4
  * Requires PHP:      7.4
  * Author:            Khusam Alfas
@@ -17,7 +17,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'ARABIC_TO_LAT_VERSION', '1.0.0' );
+define( 'ARABIC_TO_LAT_VERSION', '1.1.0' );
 define( 'ARABIC_TO_LAT_FILE', __FILE__ );
 
 require_once __DIR__ . '/includes/class-transliterator.php';

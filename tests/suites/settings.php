@@ -36,6 +36,15 @@ $p = function ( $preset, $text ) { return sanitize_title_with_dashes( ( new Arab
 t_check( 'E3', 'Maghreb: شكور', $p( 'maghreb', 'شكور' ), 'chkour' );
 t_check( 'E3', 'Maghreb: وجدة', $p( 'maghreb', 'وجدة' ), 'oujda' );
 t_check( 'E3', 'Arabizi: حبيبي عمر', $p( 'arabizi', 'حبيبي عمر' ), '7bibi-3mr' );
+t_check( 'E3', 'Persian: خانه keeps its vowel', $p( 'persian', 'خانه' ), 'khane' );
+t_check( 'E3', 'Persian: ماه keeps its h after a long vowel', $p( 'persian', 'ماه' ), 'mah' );
+t_check( 'E3', 'Persian: دانشگاه keeps its h after a long vowel', $p( 'persian', 'دانشگاه' ), 'danshgah' );
+t_check( 'E3', 'Persian: و is v', $p( 'persian', 'وردپرس' ), 'vrdprs' );
+t_check( 'E3', 'Persian: ق is gh', $p( 'persian', 'قیمت' ), 'ghimt' );
+t_check( 'E3', 'Persian: ذ ث ض read the Persian way', $p( 'persian', 'ذرت ثروت ضرر' ), 'zrt-srut-zrr' );
+t_check( 'E3', 'Standard style is unchanged by the Persian one', $p( 'standard', 'خانه' ), 'khanh' );
+t_check( 'E3', 'Arabic is unchanged by the Persian one', $p( 'standard', 'مدرسة جميلة' ), 'mdrsa-jmila' );
+t_check( 'E3', 'Custom ه beats the Persian rule', sanitize_title_with_dashes( ( new ArabicToLat\Transliterator( array( 'ه' => 'H' ), 'persian' ) )->transliterate( 'خانه' ), '', 'save' ), 'khanh' );
 t_check( 'E3', 'Custom replacement beats preset', sanitize_title_with_dashes( ( new ArabicToLat\Transliterator( array( 'ج' => 'dj' ), 'egyptian' ) )->transliterate( 'جمال' ), '', 'save' ), 'djmal' );
 t_reset_settings();
 
