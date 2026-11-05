@@ -76,6 +76,7 @@ Every row is an action or input a real site can produce, the behaviour we promis
 | E3 | Change spelling style after content exists | Only new slugs change | 4×3=12 | `settings.php` | ✅ |
 | E3 | Persian spelling style | Final ه is the vowel *e* (خانه → khane) but stays *h* after a long vowel (ماه → mah); و → v, ق → gh, ذ/ث/ض read the Persian way; the Standard style and all Arabic output are untouched; a custom ه beats the rule | 9 | `settings.php` | ✅ |
 | E4 | Convert twice | Second run converts 0 (idempotent) | 3×3=9 | `converter.php` | ✅ |
+| E12 | Re-convert slugs the plugin already made, after a style change | Off by default and a separate action; only slugs the plugin produced change (a hand-written one is recognised by running the title through every style and left alone); uploads never renamed; old URLs 301; idempotent | 16 | `converter.php` | ✅ |
 | E5 | Convert without the backup tick (no JavaScript) | Refused | 3×2=6 | `security.php` | ✅ |
 | E6 | Editor / author role opens the converter, calls the batch AJAX | Denied (403) | 4×2=8 | `security.php` | ✅ |
 | E7 | Batch AJAX without a valid nonce | Denied | 4×2=8 | `security.php` | ✅ |

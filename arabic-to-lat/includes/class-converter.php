@@ -37,6 +37,18 @@ final class Converter {
 	 */
 	private $taxonomies;
 
+	/**
+	 * Whether to also rewrite slugs this plugin already converted, so that a
+	 * site which changed its spelling style can bring old URLs in line.
+	 *
+	 * Off by default and never switched on implicitly: it rewrites URLs that
+	 * currently work, and only the site owner can judge whether that is worth
+	 * it. See can_reconvert() for the rule that keeps hand-written slugs safe.
+	 *
+	 * @var bool
+	 */
+	private $reconvert = false;
+
 	public function __construct( Transliterator $transliterator ) {
 		$this->transliterator = $transliterator;
 		$this->post_types     = self::post_types();
@@ -60,6 +72,32 @@ final class Converter {
 			$this->taxonomies = array_values( array_intersect( self::taxonomies(), array_map( 'strval', (array) $taxonomies ) ) );
 		}
 		return $this;
+	}
+
+	/**
+	 * Also rewrite already-Latin slugs that this plugin produced, using the
+	 * current spelling style.
+	 *
+	 * Attachments are dropped from the scope here whatever was requested:
+	 * renaming an uploaded file breaks every hotlink and embed pointing at it,
+	 * and /wp-content/uploads/ has no redirect to repair it with.
+	 *
+	 * @param bool $on Whether to re-convert.
+	 * @return $this
+	 */
+	public function reconvert( $on = true ) {
+		$this->reconvert = (bool) $on;
+		if ( $this->reconvert ) {
+			$this->post_types = array_values( array_diff( $this->post_types, array( 'attachment' ) ) );
+		}
+		return $this;
+	}
+
+	/**
+	 * Whether the converter is in re-conversion mode.
+	 */
+	public function is_reconverting() {
+		return $this->reconvert;
 	}
 
 	/**
@@ -218,19 +256,68 @@ final class Converter {
 	 *
 	 * @param string $encoded Slug as stored by WordPress.
 	 */
-	public function new_slug( $encoded ) {
+	public function new_slug( $encoded, $source = '' ) {
 		$decoded = rawurldecode( $encoded );
+
 		if ( ! Transliterator::has_arabic( $decoded ) ) {
-			return '';
+			// A Latin slug can only be rebuilt from the title it came from.
+			if ( ! $this->reconvert || ! self::can_reconvert( $encoded, $source ) ) {
+				return '';
+			}
+			$slug = self::slug_from( $source, $this->transliterator );
+			return ( '' === $slug || $slug === $encoded ) ? '' : $slug;
 		}
+
 		$slug = sanitize_title_with_dashes( $this->transliterator->transliterate( $decoded ), '', 'save' );
 		return ( '' === $slug || $slug === $encoded ) ? '' : $slug;
+	}
+
+	/**
+	 * Whether a Latin slug may be rebuilt from its title.
+	 *
+	 * Only when the slug is one this plugin produced: the title is run through
+	 * every spelling style, and the slug has to match one of them. A slug the
+	 * author typed by hand matches none and is left alone — which is the whole
+	 * safety of re-conversion, because a title can always be transliterated,
+	 * but only a generated slug may be overwritten without losing a decision
+	 * somebody made on purpose.
+	 *
+	 * A trailing uniqueness suffix (-2, -3) is allowed, since
+	 * wp_unique_post_slug() may have added one when the slug was created.
+	 *
+	 * @param string $slug   Current slug, as stored.
+	 * @param string $source Post title or term name.
+	 */
+	public static function can_reconvert( $slug, $source ) {
+		if ( '' === $slug || ! is_string( $source ) || ! Transliterator::has_arabic( $source ) ) {
+			return false;
+		}
+
+		$bare = (string) preg_replace( '/-\d+$/', '', $slug );
+
+		foreach ( array_keys( Transliterator::presets() ) as $preset ) {
+			$candidate = self::slug_from( $source, new Transliterator( array(), $preset ) );
+			if ( '' !== $candidate && ( $candidate === $slug || $candidate === $bare ) ) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/**
+	 * The slug a title would get from one transliterator.
+	 *
+	 * @param string         $source        Post title or term name.
+	 * @param Transliterator $transliterator Style to use.
+	 */
+	private static function slug_from( $source, Transliterator $transliterator ) {
+		return sanitize_title_with_dashes( $transliterator->transliterate( (string) $source ), '', 'save' );
 	}
 
 	private function convert_post( $row, $dry_run ) {
 		global $wpdb;
 
-		$slug = $this->new_slug( $row->slug );
+		$slug = $this->new_slug( $row->slug, isset( $row->title ) ? $row->title : '' );
 		if ( '' === $slug ) {
 			return null;
 		}
@@ -265,7 +352,7 @@ final class Converter {
 	private function convert_term( $row, $dry_run ) {
 		global $wpdb;
 
-		$slug = $this->new_slug( $row->slug );
+		$slug = $this->new_slug( $row->slug, isset( $row->name ) ? $row->name : '' );
 		if ( '' === $slug ) {
 			return null;
 		}
@@ -327,7 +414,7 @@ final class Converter {
 		$args[] = $after;
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- Batched admin/CLI tool; WHERE contains only %s placeholders, filled by prepare().
-		return $wpdb->get_results( $wpdb->prepare( "SELECT ID AS id, post_name AS slug, post_type AS type, post_status AS status, post_parent AS parent FROM {$wpdb->posts} WHERE {$where} AND ID > %d ORDER BY ID ASC LIMIT 100", $args ) );
+		return $wpdb->get_results( $wpdb->prepare( "SELECT ID AS id, post_name AS slug, post_title AS title, post_type AS type, post_status AS status, post_parent AS parent FROM {$wpdb->posts} WHERE {$where} AND ID > %d ORDER BY ID ASC LIMIT 100", $args ) );
 	}
 
 	private function fetch_terms( $after ) {
@@ -340,7 +427,7 @@ final class Converter {
 		$args[] = $after;
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- Batched admin/CLI tool; WHERE contains only %s placeholders, filled by prepare().
-		return $wpdb->get_results( $wpdb->prepare( "SELECT t.term_id AS id, t.slug AS slug, tt.taxonomy AS taxonomy FROM {$wpdb->terms} t INNER JOIN {$wpdb->term_taxonomy} tt ON tt.term_id = t.term_id WHERE {$where} AND t.term_id > %d ORDER BY t.term_id ASC LIMIT 100", $args ) );
+		return $wpdb->get_results( $wpdb->prepare( "SELECT t.term_id AS id, t.slug AS slug, t.name AS name, tt.taxonomy AS taxonomy FROM {$wpdb->terms} t INNER JOIN {$wpdb->term_taxonomy} tt ON tt.term_id = t.term_id WHERE {$where} AND t.term_id > %d ORDER BY t.term_id ASC LIMIT 100", $args ) );
 	}
 
 	/**
@@ -351,9 +438,14 @@ final class Converter {
 		if ( ! $types ) {
 			return array( '', array() );
 		}
+		$where = 'post_type IN (' . implode( ',', array_fill( 0, count( $types ), '%s' ) ) . ") AND post_status NOT IN ('auto-draft', 'trash')";
+		if ( $this->reconvert ) {
+			// Latin slugs do not match the encoded-Arabic filter, so every row
+			// has to be looked at; can_reconvert() decides row by row.
+			return array( $where, $types );
+		}
 		list( $like, $args ) = $this->like_clause( 'post_name' );
-		$where               = 'post_type IN (' . implode( ',', array_fill( 0, count( $types ), '%s' ) ) . ") AND post_status NOT IN ('auto-draft', 'trash') AND ({$like})";
-		return array( $where, array_merge( $types, $args ) );
+		return array( $where . " AND ({$like})", array_merge( $types, $args ) );
 	}
 
 	/**
@@ -364,9 +456,13 @@ final class Converter {
 		if ( ! $taxonomies ) {
 			return array( '', array() );
 		}
+		$where = 'tt.taxonomy IN (' . implode( ',', array_fill( 0, count( $taxonomies ), '%s' ) ) . ')';
+		if ( $this->reconvert ) {
+			/** This comment is documented in includes/class-converter.php */
+			return array( $where, $taxonomies );
+		}
 		list( $like, $args ) = $this->like_clause( 't.slug' );
-		$where               = 'tt.taxonomy IN (' . implode( ',', array_fill( 0, count( $taxonomies ), '%s' ) ) . ") AND ({$like})";
-		return array( $where, array_merge( $taxonomies, $args ) );
+		return array( $where . " AND ({$like})", array_merge( $taxonomies, $args ) );
 	}
 
 	private function like_clause( $column ) {
