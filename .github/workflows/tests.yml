@@ -127,6 +127,11 @@ jobs:
     name: WordPress Plugin Check
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    # The action writes its findings as a pull request comment; without this it
+    # still fails the job correctly but logs "Resource not accessible by integration".
+    permissions:
+      contents: read
+      pull-requests: write
     steps:
       - uses: actions/checkout@v5
 
