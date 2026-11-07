@@ -24,6 +24,8 @@ Paste that link into an email, a WhatsApp message or a spreadsheet and that is e
 
 It works automatically for every new post, page, product, category, tag and uploaded file. No API key, no external service, no AI credits: the transliteration runs inside WordPress.
 
+Optional: with your own Claude or ChatGPT API key, authors can also ask for an **English slug that describes the post** (طبخة ملوخية → *molokhia-recipe*), right in the block editor. It's off by default and only used when the author picks the suggestion.
+
 = What it does =
 
 * **Transliterates new slugs** of posts, pages, custom post types, WooCommerce products, categories, tags and custom taxonomies from Arabic script to Latin letters.
@@ -35,6 +37,7 @@ It works automatically for every new post, page, product, category, tag and uplo
 * **Regional spelling styles**: Standard, Egyptian (جمال → *gmal*), Maghreb / French (شكور → *chkour*, وجدة → *oujda*), Franco-Arabic / Arabizi chat numbers (حبيبي → *7bibi*) or **Persian (Farsi)**, which reads the letters the Persian way: خانه → *khane* not *khanh*, وردپرس → *vrdprs*, قیمت → *ghimt*, while ماه stays *mah*.
 * **Editable table**: override any letter, for example ع = 3 for Franco-Arabic (Arabizi) style, or whole words (محمد = mohammed) from the settings page.
 * **Latin slug preview in the block editor** while you type the title, before the first save.
+* **Optional AI slug suggestions** with your own Claude (Anthropic) or ChatGPT (OpenAI) key: an English slug that says what the post is about, the way people search for it (طبخة ملوخية → *molokhia-recipe*), or a translation of the title (*molokhia-dish*). Names, dishes and places stay in their usual spelling. Suggested in the block editor, used only when the author clicks it; cached, with a daily limit. Off by default.
 * **Converts existing Arabic slugs on request**: preview first, choose post types and taxonomies, and follow a progress bar; any number of posts, no timeouts. Old URLs keep working: they redirect (301) to the new ones, for posts, pages, categories and tags.
 * **Never touches what isn't a slug**: heading anchors from table-of-contents plugins and CSS classes on your public pages keep their Arabic, so links people already shared still work.
 * **Never changes existing links on its own.** Activating the plugin only affects new slugs.
@@ -115,7 +118,7 @@ Google can read Arabic URLs, so they are not a ranking problem in themselves. La
 
 Translation needs an external service or an AI API key, costs money per post, sends your content to a third party and can produce a slug that doesn't match the page. Transliteration is instant, free, private and predictable. You can always type an English slug yourself; the plugin never overwrites a slug you entered in Latin letters.
 
-Optional AI-written English slugs, using your own API key, are planned for a later version. Transliteration will stay the default and will keep working without any key.
+If you do want English slugs, switch on the optional AI suggestions (see below): they use your own API key, only run when an author asks, and transliteration stays the default.
 
 = Can I change how a letter is written? =
 
@@ -157,9 +160,30 @@ Yes. When you add a field with an Arabic label, the generated field name is Lati
 
 No. It runs in short batches with a progress bar until everything is done, and you can limit it to some post types or taxonomies. On the command line, use `wp arabic-to-lat convert`.
 
+= How do the AI slug suggestions work? =
+
+In Settings → Arabic to Latin → AI slug suggestions, choose Claude or ChatGPT, paste your API key and switch them on. In the block editor a panel "English slug (AI)" appears: click "Suggest", and the post title and the start of the post are sent to the provider, which answers with a short English slug. Nothing changes until you click "Use this slug", and you can still edit it. Without a key, or when switched off, nothing is sent anywhere.
+
+= What do AI suggestions cost, and can they run up my bill? =
+
+Each suggestion is one small request on your own API account, usually a fraction of a cent. The same post and title are answered from a cache for free, and a daily limit (100 by default) stops requests until the next day.
+
+= Where is my API key stored? =
+
+Encrypted in the database, using a key derived from your site's WordPress salts, and never shown again on the settings page (only its last four characters). To keep it out of the database entirely, define `ARABIC_TO_LAT_ANTHROPIC_KEY` or `ARABIC_TO_LAT_OPENAI_KEY` in wp-config.php. Uninstalling the plugin deletes a stored key.
+
 = I used version 0.3. Anything to do? =
 
 No. Your existing slugs stay as they are and the `atl_table` filter still works. Version 1.0 fixes slugs not being converted in the block editor and no longer turns non-Arabic characters into dashes.
+
+== External services ==
+
+The plugin works without any external service. Only if you switch on the optional **AI slug suggestions** and add an API key does it connect to the provider you choose:
+
+* **Anthropic (Claude)**, `https://api.anthropic.com/v1/messages` — [Commercial Terms](https://www.anthropic.com/legal/commercial-terms), [Privacy Policy](https://www.anthropic.com/legal/privacy).
+* **OpenAI (ChatGPT)**, `https://api.openai.com/v1/responses` — [Services Agreement](https://openai.com/policies/services-agreement/), [Privacy Policy](https://openai.com/policies/row-privacy-policy/), [API data usage](https://openai.com/policies/api-data-usage-policies).
+
+What is sent, and when: the post title and the first 300 words of the post text, with your API key, each time an author clicks "Suggest" in the block editor or an administrator clicks "Test connection". Nothing is sent automatically, on saving or publishing, or about visitors. The provider returns a suggested slug.
 
 == Screenshots ==
 
@@ -168,6 +192,12 @@ No. Your existing slugs stay as they are and the `atl_table` filter still works.
 3. A Latin slug generated in the block editor from an Arabic title.
 
 == Changelog ==
+
+= 1.2.0 =
+* New: **optional AI slug suggestions** with your own Claude (Anthropic) or ChatGPT (OpenAI) API key. In the block editor, ask for an English slug that describes the post (طبخة ملوخية → *molokhia-recipe*) or translates the title (*molokhia-dish*); it is used only when you click "Use this slug". Off by default; without a key nothing is sent anywhere.
+* Keys are stored encrypted (or defined in wp-config.php) and never shown again. Suggestions are cached, and a daily limit protects your API bill.
+* Every AI answer is checked: only a clean Latin slug (a-z, digits, hyphens, up to 8 words) is accepted, and it is made unique like any WordPress slug.
+* Transliteration is unchanged: no existing site's URLs move, and nothing calls the AI on save.
 
 = 1.1.0 =
 * New: **re-convert slugs the plugin already converted**, for sites that change spelling style. It is a separate, optional step on the settings page, off by default, with a preview and two confirmations, and old URLs are redirected (301) to the new ones. Only slugs this plugin produced are touched: a slug you typed yourself is recognised and left alone. Uploaded files are never renamed, because there is no redirect for a file. Also available as `wp arabic-to-lat convert --reconvert`.

@@ -23,14 +23,20 @@ define( 'ARABIC_TO_LAT_FILE', __FILE__ );
 require_once __DIR__ . '/includes/class-transliterator.php';
 require_once __DIR__ . '/includes/class-plugin.php';
 require_once __DIR__ . '/includes/class-converter.php';
+require_once __DIR__ . '/includes/class-ai.php';
+require_once __DIR__ . '/includes/class-ai-provider.php';
 
 // Registered at load time, not on a later hook, so slugs created early
 // (imports, cron, REST requests) are covered too.
 ArabicToLat\Plugin::instance()->init();
+// Optional AI slug suggestions: inert until switched on with an API key.
+( new ArabicToLat\AI() )->init();
 
 if ( is_admin() ) {
 	require_once __DIR__ . '/includes/class-admin.php';
+	require_once __DIR__ . '/includes/class-ai-admin.php';
 	( new ArabicToLat\Admin() )->init();
+	( new ArabicToLat\AI_Admin() )->init();
 }
 
 if ( defined( 'WP_CLI' ) && WP_CLI ) {

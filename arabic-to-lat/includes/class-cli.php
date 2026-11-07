@@ -115,4 +115,40 @@ final class CLI {
 	public function slug( $args ) {
 		\WP_CLI::line( rawurldecode( sanitize_title( $args[0] ) ) );
 	}
+
+	/**
+	 * Asks the configured AI provider for a slug (uses the daily limit and cache).
+	 *
+	 * ## OPTIONS
+	 *
+	 * <title>
+	 * : Post title.
+	 *
+	 * [--content=<text>]
+	 * : Start of the post text.
+	 *
+	 * [--style=<style>]
+	 * : describe or translate. Default: the setting.
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     wp arabic-to-lat ai-suggest "طبخة ملوخية"
+	 *
+	 * @subcommand ai-suggest
+	 * @param array $args       Positional arguments.
+	 * @param array $assoc_args Named arguments.
+	 */
+	public function ai_suggest( $args, $assoc_args ) {
+		$result = AI::suggest(
+			array(
+				'title'   => $args[0],
+				'content' => isset( $assoc_args['content'] ) ? (string) $assoc_args['content'] : '',
+				'style'   => isset( $assoc_args['style'] ) ? (string) $assoc_args['style'] : null,
+			)
+		);
+		if ( is_wp_error( $result ) ) {
+			\WP_CLI::error( $result->get_error_message() );
+		}
+		\WP_CLI::line( $result['slug'] . ( $result['cached'] ? ' (cached)' : '' ) );
+	}
 }

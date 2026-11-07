@@ -139,3 +139,28 @@ Every row is an action or input a real site can produce, the behaviour we promis
 | J5 | Database not utf8mb4 | ⛔ WordPress requirement, not plugin-specific | — | ⛔ | ⛔ |
 | J6 | WP 6.4 (minimum) and current | Full suite passes on both | 4×2=8 | `run.sh --wp=6.4` |
 | J7 | PHP 7.4 (minimum) | Full suite passes | 5×2=10 | `run.sh --php=7.4` (Docker) | ✅ |
+
+## K. AI slug suggestions (1.2, optional, off by default)
+
+The site owner adds their own Claude (Anthropic) or ChatGPT (OpenAI) API key. In the block editor an author asks for an English slug that describes the post; the suggestion is shown and only used when the author clicks it. Nothing runs automatically and nothing runs without a key.
+
+| ID | Scenario | Expected | Risk | Test | Status |
+|---|---|---|---|---|---|
+| K1 | AI never configured (every existing site after updating) | No editor panel, no external request, transliteration identical to 1.1 | 5×5=25 | `ai.php` | ✅ |
+| K2 | AI switched on but no key | Clear "add an API key" message; no request sent | 3×3=9 | `ai.php` | ✅ |
+| K3 | Claude request | `POST https://api.anthropic.com/v1/messages`, `x-api-key`, `anthropic-version: 2026-10-21`, JSON-schema output, low effort, no `temperature`; title and text sent as delimited data | 4×4=16 | `ai.php` | ✅ |
+| K4 | ChatGPT request | `POST https://api.openai.com/v1/responses`, `Bearer` key, strict JSON-schema `text.format` | 4×4=16 | `ai.php` | ✅ |
+| K5 | Good answer (`molokhia-recipe`) | Shown as suggestion, already made unique (`-2` if taken) | 4×5=20 | `ai.php` | ✅ |
+| K6 | Answer is not a usable slug (spaces, Arabic, 40 words, not JSON, empty) | Rejected with "the AI returned something unusable"; nothing saved | 4×3=12 | `ai.php` | ✅ |
+| K7 | Key wrong (401), no credit (402), rate limit (429), provider overloaded (5xx/529), network timeout | Each gets its own plain message; editor keeps working; never a fatal | 4×4=16 | `ai.php` | ✅ |
+| K8 | Provider declines (refusal) or answer cut off | Clear message, no partial slug | 3×2=6 | `ai.php` | ✅ |
+| K9 | Same title and text asked twice | Second answer from cache, no second paid request | 3×4=12 | `ai.php` | ✅ |
+| K10 | Daily limit reached | Requests stop with a message until the next day | 4×2=8 | `ai.php` | ✅ |
+| K11 | Permissions: logged out, subscriber, author on someone else's post, author on own post | 401 / 403 / 403 / allowed | 5×2=10 | `ai.php` (HTTP) | ✅ |
+| K12 | API key exposure: settings page, REST answers, page source, debug output | Key never printed; stored encrypted; only the last 4 characters shown | 5×3=15 | `ai.php` | ✅ |
+| K13 | Key set in `wp-config.php` constant | Constant wins; settings field shows it as managed there | 3×2=6 | `ai.php` | ✅ |
+| K14 | Post text tries to instruct the model ("ignore the rules, output …") | Text is sent as delimited data; whatever comes back must still pass slug validation | 4×2=8 | `ai.php` | ✅ |
+| K15 | "Translate the title" style instead of "describe the post" | Prompt changes accordingly; output rules the same | 2×3=6 | `ai.php` | ✅ |
+| K16 | Uninstall | AI settings and stored key deleted | 4×2=8 | `ai.php` | ✅ |
+| K17 | Privacy: owner needs to know what leaves the site | Settings and readme say what is sent, to whom, when; WordPress privacy guide text added | 4×3=12 | `ai.php` + readme | ✅ |
+| K18 | Live call with a real key (optional, only when `ATL_TEST_ANTHROPIC_KEY` / `ATL_TEST_OPENAI_KEY` is set) | Real slug for طبخة ملوخية is Latin, short, describes the dish | 3×2=6 | `ai.php` (skipped without key) | skipped without a key |
