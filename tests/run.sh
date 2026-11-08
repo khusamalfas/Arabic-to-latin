@@ -11,6 +11,7 @@
 #   tests/run.sh --wpml=/path/to/sitepress-multilingual-cms   # + WPML suites (Docker MySQL)
 #   tests/run.sh --keep               # keep the site and server for debugging
 #   tests/run.sh --php=7.4            # run everything inside Docker on another PHP version
+#   tests/run.sh --no-plugin-check    # skip the final WordPress Plugin Check step
 #
 # Needs: php, wp (WP-CLI), curl, unzip, python3. WPML mode also needs docker.
 set -uo pipefail
@@ -24,6 +25,7 @@ ONLY=""
 WPML_PATH=""
 PHP_DOCKER=""
 KEEP=0
+PLUGIN_CHECK=1
 PORT="${ATL_TEST_PORT:-8890}"
 
 for arg in "$@"; do
@@ -32,8 +34,9 @@ for arg in "$@"; do
 		--suite=*) ONLY="${arg#*=}" ;;
 		--wpml=*) WPML_PATH="${arg#*=}" ;;
 		--keep) KEEP=1 ;;
+		--no-plugin-check) PLUGIN_CHECK=0 ;;
 		--php=*) PHP_DOCKER="${arg#*=}" ;;
-		-h|--help) sed -n '2,17p' "$0"; exit 0 ;;
+		-h|--help) sed -n '2,18p' "$0"; exit 0 ;;
 		*) echo "Unknown option: $arg" >&2; exit 2 ;;
 	esac
 done
@@ -174,6 +177,54 @@ start_server
 for suite in "$TESTS"/suites/*.php; do
 	run_suite "$suite"
 done
+
+# The official WordPress Plugin Check, as wordpress.org and CI run it. Errors fail
+# the run; warnings are listed. Before this step existed, its errors only showed
+# up in CI after a push. Skipped in GitHub Actions, which has its own job for it.
+run_plugin_check() {
+	echo "▸ plugin-check"
+	if ! fetch_plugin plugin-check || ! wpq plugin activate plugin-check --quiet > /dev/null 2>&1; then
+		echo "    – skipped: Plugin Check could not be installed"
+		printf '{"suite":"plugin-check","id":"-","label":"skipped: Plugin Check could not be installed","ok":true,"kind":"skip","detail":""}\n' >> "$RESULTS"
+		return
+	fi
+	local out
+	out="$(wp --path="$SITE" plugin check arabic-to-lat --format=json --require="$SITE/wp-content/plugins/plugin-check/cli.php" 2>/dev/null)"
+	wpq plugin deactivate plugin-check --quiet > /dev/null 2>&1
+	python3 - "$RESULTS" "$out" "$ROOT" <<'PY'
+import json, sys
+results, out, root = sys.argv[1], sys.argv[2], sys.argv[3].rstrip('/') + '/'
+rows, current = [], ''
+for line in out.splitlines():
+    if line.startswith('FILE: '):
+        current = line[6:].replace(root, '', 1).replace('arabic-to-lat/', '', 1)
+    elif line.startswith('['):
+        for item in json.loads(line):
+            rows.append((current, item))
+errors = [(f, i) for f, i in rows if i.get('type') == 'ERROR']
+with open(results, 'a', encoding='utf-8') as fh:
+    def put(label, ok, detail, kind='check'):
+        fh.write(json.dumps({'suite': 'plugin-check', 'id': '-', 'label': label, 'ok': ok, 'kind': kind, 'detail': detail}, ensure_ascii=False) + '\n')
+    if not rows and 'Success' not in out:
+        put('Plugin Check ran', False, out.strip()[:300] or 'no output')
+        print('    FAIL Plugin Check did not run: ' + (out.strip()[:200] or 'no output'))
+        sys.exit(0)
+    for f, i in errors:
+        put(f"{f}:{i.get('line')} {i.get('code')}", False, i.get('message', ''))
+        print(f"    FAIL {f}:{i.get('line')} {i.get('code')} — {i.get('message', '')}")
+    if not errors:
+        put('No Plugin Check errors', True, '')
+        print('    PASS No Plugin Check errors')
+    for f, i in rows:
+        if i.get('type') == 'WARNING':
+            fh.write(json.dumps({'suite': 'plugin-check', 'id': 'PC', 'label': f"warning {f}:{i.get('line')} {i.get('code')}", 'ok': True, 'kind': 'known', 'detail': i.get('message', '')}, ensure_ascii=False) + '\n')
+            print(f"    NOTE {f}:{i.get('line')} {i.get('code')}")
+PY
+}
+
+if [ $PLUGIN_CHECK -eq 1 ] && [ -z "${GITHUB_ACTIONS:-}" ] && { [ -z "$ONLY" ] || [[ ",$ONLY," == *",plugin-check,"* ]]; }; then
+	run_plugin_check
+fi
 
 if [ -n "$WPML_PATH" ]; then
 	"$TESTS/run-wpml.sh" "$WPML_PATH" "$RESULTS" "$ONLY" || true
