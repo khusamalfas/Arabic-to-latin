@@ -232,7 +232,9 @@ final class Transliterator {
 		$code = 0xFE80;
 		foreach ( $shapes as $shape ) {
 			for ( $i = 0; $i < $shape[1]; $i++ ) {
-				$map[ mb_chr( $code++, 'UTF-8' ) ] = $shape[0];
+				// 3-byte UTF-8 by hand: mb_chr() needs mbstring, which not every host has.
+				$map[ chr( 0xE0 | ( $code >> 12 ) ) . chr( 0x80 | ( ( $code >> 6 ) & 0x3F ) ) . chr( 0x80 | ( $code & 0x3F ) ) ] = $shape[0];
+				++$code;
 			}
 		}
 
