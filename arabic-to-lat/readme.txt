@@ -24,7 +24,7 @@ Paste that link into an email, a WhatsApp message or a spreadsheet and that is e
 
 It works automatically for every new post, page, product, category, tag and uploaded file. No API key, no external service, no AI credits: the transliteration runs inside WordPress.
 
-Optional: with your own Claude or ChatGPT API key, authors can also ask for an **English slug that describes the post** (طبخة ملوخية → *molokhia-recipe*), right in the block editor. It's off by default and only used when the author picks the suggestion.
+Optional: with the AI connector set up in WordPress (Settings → Connectors, WordPress 7.0+) or your own Claude or ChatGPT API key, authors can also ask for an **English slug that describes the post** (طبخة ملوخية → *molokhia-recipe*), right in the block editor. It's off by default and only used when the author picks the suggestion.
 
 = What it does =
 
@@ -37,7 +37,7 @@ Optional: with your own Claude or ChatGPT API key, authors can also ask for an *
 * **Regional spelling styles**: Standard, Egyptian (جمال → *gmal*), Maghreb / French (شكور → *chkour*, وجدة → *oujda*), Franco-Arabic / Arabizi chat numbers (حبيبي → *7bibi*) or **Persian (Farsi)**, which reads the letters the Persian way: خانه → *khane* not *khanh*, وردپرس → *vrdprs*, قیمت → *ghimt*, while ماه stays *mah*.
 * **Editable table**: override any letter, for example ع = 3 for Franco-Arabic (Arabizi) style, or whole words (محمد = mohammed) from the settings page.
 * **Latin slug preview in the block editor** while you type the title, before the first save.
-* **Optional AI slug suggestions** with your own Claude (Anthropic) or ChatGPT (OpenAI) key: an English slug that says what the post is about, the way people search for it (طبخة ملوخية → *molokhia-recipe*), or a translation of the title (*molokhia-dish*). Names, dishes and places stay in their usual spelling. Suggested in the block editor, used only when the author clicks it; cached, with a daily limit. Off by default.
+* **Optional AI slug suggestions** through WordPress's AI connectors (7.0+) or your own Claude (Anthropic) or ChatGPT (OpenAI) key: an English slug that says what the post is about, the way people search for it (طبخة ملوخية → *molokhia-recipe*), or a translation of the title (*molokhia-dish*). Names, dishes and places stay in their usual spelling. Suggested in the block editor, used only when the author clicks it; cached, with a daily limit. Off by default.
 * **Converts existing Arabic slugs on request**: preview first, choose post types and taxonomies, and follow a progress bar; any number of posts, no timeouts. Old URLs keep working: they redirect (301) to the new ones, for posts, pages, categories and tags.
 * **Never touches what isn't a slug**: heading anchors from table-of-contents plugins and CSS classes on your public pages keep their Arabic, so links people already shared still work.
 * **Never changes existing links on its own.** Activating the plugin only affects new slugs.
@@ -162,7 +162,7 @@ No. It runs in short batches with a progress bar until everything is done, and y
 
 = How do the AI slug suggestions work? =
 
-In Settings → Arabic to Latin → AI slug suggestions, choose Claude or ChatGPT, paste your API key and switch them on. In the block editor a panel "English slug (AI)" appears: click "Suggest", and the post title and the start of the post are sent to the provider, which answers with a short English slug. Nothing changes until you click "Use this slug", and you can still edit it. Without a key, or when switched off, nothing is sent anywhere.
+In Settings → Arabic to Latin → AI slug suggestions, switch them on and choose where the AI comes from: on WordPress 7.0 and later, the **WordPress AI connector** uses the AI service you already set up in Settings → Connectors, with no key to paste here; on any version you can instead choose Claude or ChatGPT and paste your own API key. In the block editor a panel "English slug (AI)" appears: click "Suggest", and the post title and the start of the post are sent to the provider, which answers with a short English slug. Nothing changes until you click "Use this slug", and you can still edit it. While they are switched off, nothing is sent anywhere.
 
 = What do AI suggestions cost, and can they run up my bill? =
 
@@ -178,12 +178,13 @@ No. Your existing slugs stay as they are and the `atl_table` filter still works.
 
 == External services ==
 
-The plugin works without any external service. Only if you switch on the optional **AI slug suggestions** and add an API key does it connect to the provider you choose:
+The plugin works without any external service. Only if you switch on the optional **AI slug suggestions** does it connect to an AI provider:
 
-* **Anthropic (Claude)**, `https://api.anthropic.com/v1/messages` — [Commercial Terms](https://www.anthropic.com/legal/commercial-terms), [Privacy Policy](https://www.anthropic.com/legal/privacy).
-* **OpenAI (ChatGPT)**, `https://api.openai.com/v1/responses` — [Services Agreement](https://openai.com/policies/services-agreement/), [Privacy Policy](https://openai.com/policies/row-privacy-policy/), [API data usage](https://openai.com/policies/api-data-usage-policies).
+* **WordPress AI connector** (WordPress 7.0+): the request goes through WordPress's built-in AI Client to the service you set up in Settings → Connectors, under that service's terms, which its provider plugin lists.
+* **Anthropic (Claude)** with your own API key, `https://api.anthropic.com/v1/messages` — [Commercial Terms](https://www.anthropic.com/legal/commercial-terms), [Privacy Policy](https://www.anthropic.com/legal/privacy).
+* **OpenAI (ChatGPT)** with your own API key, `https://api.openai.com/v1/responses` — [Services Agreement](https://openai.com/policies/services-agreement/), [Privacy Policy](https://openai.com/policies/row-privacy-policy/), [API data usage](https://openai.com/policies/api-data-usage-policies).
 
-What is sent, and when: the post title and the first 300 words of the post text, with your API key, each time an author clicks "Suggest" in the block editor or an administrator clicks "Test connection". Nothing is sent automatically, on saving or publishing, or about visitors. The provider returns a suggested slug.
+What is sent, and when: the post title and the first 300 words of the post text, each time an author clicks "Suggest" in the block editor or an administrator clicks "Test connection". Nothing is sent automatically, on saving or publishing, or about visitors. The provider returns a suggested slug.
 
 == Screenshots ==
 
@@ -194,7 +195,7 @@ What is sent, and when: the post title and the first 300 words of the post text,
 == Changelog ==
 
 = 1.2.0 =
-* New: **optional AI slug suggestions** with your own Claude (Anthropic) or ChatGPT (OpenAI) API key. In the block editor, ask for an English slug that describes the post (طبخة ملوخية → *molokhia-recipe*) or translates the title (*molokhia-dish*); it is used only when you click "Use this slug". Off by default; without a key nothing is sent anywhere.
+* New: **optional AI slug suggestions**, through the AI connector set up in WordPress 7.0+ (Settings → Connectors) or with your own Claude (Anthropic) or ChatGPT (OpenAI) API key. In the block editor, ask for an English slug that describes the post (طبخة ملوخية → *molokhia-recipe*) or translates the title (*molokhia-dish*); it is used only when you click "Use this slug". Off by default; while off, nothing is sent anywhere.
 * Keys are stored encrypted (or defined in wp-config.php) and never shown again. Suggestions are cached, and a daily limit protects your API bill.
 * Every AI answer is checked: only a clean Latin slug (a-z, digits, hyphens, up to 8 words) is accepted, and it is made unique like any WordPress slug.
 * Transliteration is unchanged: no existing site's URLs move, and nothing calls the AI on save.

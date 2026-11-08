@@ -54,7 +54,7 @@ final class AI_Admin {
 		$models = AI::models();
 		$clean  = array(
 			'enabled'     => ! empty( $input['enabled'] ),
-			'provider'    => isset( $input['provider'] ) && isset( $models[ $input['provider'] ] ) ? (string) $input['provider'] : 'anthropic',
+			'provider'    => self::clean_provider( isset( $input['provider'] ) ? (string) $input['provider'] : '', $models ),
 			'style'       => isset( $input['style'] ) && 'translate' === $input['style'] ? 'translate' : 'describe',
 			'daily_limit' => isset( $input['daily_limit'] ) ? min( 10000, max( 0, (int) $input['daily_limit'] ) ) : 100,
 		);
@@ -72,6 +72,22 @@ final class AI_Admin {
 			}
 		}
 		return $clean;
+	}
+
+	/**
+	 * A known provider; "wordpress" only where core has the AI Client.
+	 *
+	 * @param string $provider Submitted value.
+	 * @param array  $models   AI::models().
+	 */
+	private static function clean_provider( $provider, array $models ) {
+		if ( isset( $models[ $provider ] ) ) {
+			return $provider;
+		}
+		if ( AI::WORDPRESS === $provider && AI::wordpress_client_exists() ) {
+			return $provider;
+		}
+		return AI::wordpress_client_exists() ? AI::WORDPRESS : 'anthropic';
 	}
 
 	/**
@@ -107,8 +123,8 @@ final class AI_Admin {
 		$test = isset( $_GET['arabic_to_lat_ai_tested'] ) ? get_transient( 'arabic_to_lat_ai_test_' . get_current_user_id() ) : false;
 		?>
 		<h2 id="atl-ai"><?php esc_html_e( 'AI slug suggestions (optional)', 'arabic-to-lat' ); ?></h2>
-		<p><?php esc_html_e( 'With your own Claude or ChatGPT API key, authors can ask for an English slug that describes the post, for example طبخة ملوخية → molokhia-recipe. The suggestion appears in the block editor and is only used when the author picks it. Nothing runs automatically, and transliteration keeps working with or without a key.', 'arabic-to-lat' ); ?></p>
-		<p class="description"><?php esc_html_e( 'Privacy: when an author asks for a suggestion, the post title and the first 300 words of the post are sent to the provider you choose below (Anthropic or OpenAI). Each request uses your API account and costs a fraction of a cent.', 'arabic-to-lat' ); ?></p>
+		<p><?php esc_html_e( 'With an AI service, authors can ask for an English slug that describes the post, for example طبخة ملوخية → molokhia-recipe. The suggestion appears in the block editor and is only used when the author picks it. Nothing runs automatically, and transliteration keeps working without AI.', 'arabic-to-lat' ); ?></p>
+		<p class="description"><?php esc_html_e( 'Privacy: when an author asks for a suggestion, the post title and the first 300 words of the post are sent to the AI service you choose below. Each request uses your own AI account and costs a fraction of a cent.', 'arabic-to-lat' ); ?></p>
 
 		<?php if ( is_array( $test ) ) : ?>
 			<?php if ( isset( $test['error'] ) ) : ?>
@@ -140,6 +156,28 @@ final class AI_Admin {
 					<td>
 						<fieldset>
 							<legend class="screen-reader-text"><?php esc_html_e( 'Provider', 'arabic-to-lat' ); ?></legend>
+							<?php if ( AI::wordpress_client_exists() ) : ?>
+								<div style="margin-bottom:12px">
+									<label><input type="radio" name="<?php echo esc_attr( $option ); ?>[provider]" value="<?php echo esc_attr( AI::WORDPRESS ); ?>" <?php checked( $settings['provider'], AI::WORDPRESS ); ?>> <strong><?php esc_html_e( 'WordPress AI connector', 'arabic-to-lat' ); ?></strong></label>
+									<p style="margin:6px 0 0 24px">
+										<?php
+										if ( ! AI::wordpress_client_available() ) {
+											esc_html_e( 'AI features are switched off on this site.', 'arabic-to-lat' );
+										} elseif ( AI::WORDPRESS === $settings['provider'] && AI::wordpress_connector_ready() ) {
+											esc_html_e( 'Ready: uses the AI service and key set up in Settings → Connectors. No key needed here.', 'arabic-to-lat' );
+										} elseif ( AI::WORDPRESS === $settings['provider'] ) {
+											printf(
+												/* translators: %s: link to Settings → Connectors */
+												esc_html__( 'No AI connector is set up yet. Add one in %s (for example Anthropic or OpenAI), then come back.', 'arabic-to-lat' ),
+												'<a href="' . esc_url( admin_url( 'options-connectors.php' ) ) . '">' . esc_html__( 'Settings → Connectors', 'arabic-to-lat' ) . '</a>'
+											);
+										} else {
+											esc_html_e( 'Uses the AI service and key set up in Settings → Connectors. No key needed here.', 'arabic-to-lat' );
+										}
+										?>
+									</p>
+								</div>
+							<?php endif; ?>
 							<?php foreach ( array( 'anthropic' => 'Claude (Anthropic)', 'openai' => 'ChatGPT (OpenAI)' ) as $provider => $label ) : ?>
 								<div style="margin-bottom:12px">
 									<label><input type="radio" name="<?php echo esc_attr( $option ); ?>[provider]" value="<?php echo esc_attr( $provider ); ?>" <?php checked( $settings['provider'], $provider ); ?>> <strong><?php echo esc_html( $label ); ?></strong></label>

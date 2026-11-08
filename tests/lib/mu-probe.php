@@ -52,6 +52,17 @@ add_filter(
 		update_option( 'arabic_to_lat_test_ai_log', $log, false );
 
 		$mock = get_option( 'arabic_to_lat_test_ai_mock' );
+		// {"by_url": {"/v1/models": {code, body}, "/v1/messages": {...}}}: first fragment found in the URL wins.
+		if ( is_array( $mock ) && isset( $mock['by_url'] ) && is_array( $mock['by_url'] ) ) {
+			$picked = null;
+			foreach ( $mock['by_url'] as $fragment => $answer ) {
+				if ( false !== strpos( $url, $fragment ) ) {
+					$picked = $answer;
+					break;
+				}
+			}
+			$mock = $picked;
+		}
 		if ( ! is_array( $mock ) ) {
 			return new WP_Error( 'http_request_failed', 'Test site: outgoing AI request without a mock.' );
 		}
@@ -72,3 +83,8 @@ add_filter(
 	10,
 	3
 );
+
+// Suite ai-connectors.php: simulate a site where AI is switched off (WP_AI_SUPPORT / wp_supports_ai).
+if ( get_option( 'arabic_to_lat_test_no_ai' ) ) {
+	add_filter( 'wp_supports_ai', '__return_false' );
+}

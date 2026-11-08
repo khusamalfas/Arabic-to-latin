@@ -10,10 +10,11 @@ namespace ArabicToLat;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Builds the request for Claude (Anthropic Messages API) or ChatGPT (OpenAI
- * Responses API), sends it with the WordPress HTTP API and returns the model's
- * JSON text, or a WP_Error with a plain message. Provider error text is never
- * passed on: some providers echo part of the key in it.
+ * Sends the prompt through the WordPress AI Client (7.0+, Settings →
+ * Connectors), or builds the request for Claude (Anthropic Messages API) or
+ * ChatGPT (OpenAI Responses API) and sends it with the WordPress HTTP API.
+ * Returns the model's JSON text, or a WP_Error with a plain message. Provider
+ * error text is never passed on: some providers echo part of the key in it.
  */
 final class AI_Provider {
 
@@ -77,6 +78,50 @@ final class AI_Provider {
 			return self::invalid();
 		}
 		return 'openai' === $provider ? self::openai_text( $data ) : self::anthropic_text( $data );
+	}
+
+	/**
+	 * WordPress AI Client: the connector set up in Settings → Connectors picks
+	 * the provider and model. Same prompt, schema and validation as the direct
+	 * path. Core's error messages include the provider's text, so only the
+	 * error code and HTTP status are used.
+	 *
+	 * @param string $system Instructions.
+	 * @param string $user   Delimited title and text.
+	 * @return string|\WP_Error JSON text from the model.
+	 */
+	public static function wordpress_request( $system, $user ) {
+		$text = wp_ai_client_prompt( $user )
+			->using_system_instruction( $system )
+			->using_max_tokens( self::MAX_TOKENS )
+			->as_json_response( self::schema() )
+			->generate_text();
+
+		if ( ! is_wp_error( $text ) ) {
+			return is_string( $text ) && '' !== $text ? $text : self::invalid();
+		}
+
+		$code   = $text->get_error_code();
+		$data   = $text->get_error_data();
+		$status = is_array( $data ) && isset( $data['status'] ) ? (int) $data['status'] : 0;
+
+		switch ( $code ) {
+			case 'prompt_prevented':
+				return new \WP_Error( 'ai_wordpress_off', __( 'AI features are switched off on this site, so no suggestion can be made.', 'arabic-to-lat' ), array( 'status' => 503 ) );
+			case 'prompt_invalid_argument':
+				return new \WP_Error( 'ai_no_connector', __( 'No AI connector is set up. Add one in Settings → Connectors, or choose Claude or ChatGPT with your own key in Settings → Arabic to Latin.', 'arabic-to-lat' ), array( 'status' => 400 ) );
+			case 'prompt_network_error':
+				return false !== stripos( $text->get_error_message(), 'timed out' )
+					? new \WP_Error( 'ai_timeout', __( 'The AI provider did not answer in time. Try again in a moment.', 'arabic-to-lat' ), array( 'status' => 504 ) )
+					: new \WP_Error( 'ai_network', __( 'This site could not reach the AI provider. Check that the server can make outgoing HTTPS requests.', 'arabic-to-lat' ), array( 'status' => 502 ) );
+		}
+		if ( 401 === $status || 403 === $status ) {
+			return new \WP_Error( 'ai_key_rejected', __( 'The AI provider rejected the API key. Check it in Settings → Connectors.', 'arabic-to-lat' ), array( 'status' => 502 ) );
+		}
+		if ( $status >= 400 ) {
+			return self::http_error( $status );
+		}
+		return new \WP_Error( 'ai_request', __( 'The AI provider did not accept the request.', 'arabic-to-lat' ), array( 'status' => 502 ) );
 	}
 
 	/**

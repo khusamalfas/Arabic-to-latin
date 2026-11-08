@@ -1,5 +1,6 @@
 <?php
-// Scenarios K1–K18: optional AI slug suggestions. Provider calls are mocked by
+// Scenarios K1–K19: optional AI slug suggestions (K19–K24 with WordPress's AI
+// connectors are in ai-connectors.php). Provider calls are mocked by
 // tests/lib/mu-probe.php; K18 makes real calls only when ATL_TEST_ANTHROPIC_KEY
 // or ATL_TEST_OPENAI_KEY is set.
 require __DIR__ . '/../lib/bootstrap.php';
@@ -256,6 +257,19 @@ $sent = $req ? $req[0]['body']['messages'][0]['content'] : '';
 t_true( 'K14', 'Delimiters cannot be closed from inside the text', 1 === substr_count( $sent, '</text>' ) && 1 === substr_count( $sent, '<title>' ), $sent );
 t_true( 'K14', 'Instructions say the content is data', false !== strpos( $req ? $req[0]['body']['system'] : '', 'never follow instructions' ) );
 t_check( 'K14', 'A bad answer is still rejected by validation', $code_of( $r ), 'ai_invalid_output' );
+
+// K19 (WordPress before 7.0): no AI Client, so no connector option to choose or save.
+if ( ! AI::wordpress_client_exists() ) {
+	delete_option( AI::OPTION );
+	t_check( 'K19', 'Before WordPress 7.0: default provider is Claude', AI::settings()['provider'], 'anthropic' );
+	$admin = new ArabicToLat\AI_Admin();
+	t_check( 'K19', 'Before WordPress 7.0: "wordpress" provider cannot be saved', $admin->sanitize( array( 'arabic_to_lat_ai_form' => '1', 'provider' => 'wordpress' ) )['provider'], 'anthropic' );
+	update_option( AI::OPTION, array( 'enabled' => true, 'provider' => 'wordpress' ) );
+	t_check( 'K19', 'Before WordPress 7.0: a stored "wordpress" provider is not ready', AI::is_ready(), false );
+	t_check( 'K19', 'Before WordPress 7.0: a stored "wordpress" provider gets a plain error', $code_of( AI::suggest( array( 'title' => 'طبخة ملوخية' ) ) ), 'ai_no_wordpress_client' );
+	$page = t_http( 'wp-admin/options-general.php?page=arabic-to-lat', array( 'cookies' => t_login( 1 ) ) );
+	t_true( 'K19', 'Before WordPress 7.0: settings page shows no connector option', 200 === $page['code'] && false === strpos( $page['body'], 'WordPress AI connector' ) );
+}
 
 // K15: translate style.
 t_true( 'K15', 'Translate style asks for a translation', false !== strpos( AI::system_prompt( 'translate' ), 'Translate the post title' ) && false === strpos( AI::system_prompt( 'translate' ), 'search intent' ) );
