@@ -162,7 +162,7 @@ No. It runs in short batches with a progress bar until everything is done, and y
 
 = How do the AI slug suggestions work? =
 
-In Settings → Arabic to Latin → AI slug suggestions, switch them on and choose where the AI comes from: on WordPress 7.0 and later, the **WordPress AI connector** uses the AI service you already set up in Settings → Connectors, with no key to paste here; on any version you can instead choose Claude or ChatGPT and paste your own API key. In the block editor a panel "English slug (AI)" appears: click "Suggest", and the post title and the start of the post are sent to the provider, which answers with a short English slug. Nothing changes until you click "Use this slug", and you can still edit it. While they are switched off, nothing is sent anywhere.
+In Settings → Arabic to Latin → AI slug suggestions, switch them on and choose where the AI comes from: on WordPress 7.0 and later, the **WordPress AI connector** uses the AI service you already set up in Settings → Connectors (tested with the official providers for Anthropic Claude and Google Gemini), with no key to paste here; on any version you can instead choose Claude or ChatGPT and paste your own API key. In the block editor a panel "English slug (AI)" appears: click "Suggest", and the post title and the start of the post are sent to the provider, which answers with a short English slug. Nothing changes until you click "Use this slug", and you can still edit it. While they are switched off, nothing is sent anywhere.
 
 = What do AI suggestions cost, and can they run up my bill? =
 
@@ -180,7 +180,7 @@ No. Your existing slugs stay as they are and the `atl_table` filter still works.
 
 The plugin works without any external service. Only if you switch on the optional **AI slug suggestions** does it connect to an AI provider:
 
-* **WordPress AI connector** (WordPress 7.0+): the request goes through WordPress's built-in AI Client to the service you set up in Settings → Connectors, under that service's terms, which its provider plugin lists.
+* **WordPress AI connector** (WordPress 7.0+): the request goes through WordPress's built-in AI Client to the service you set up in Settings → Connectors (for example Anthropic, OpenAI or Google Gemini at `https://generativelanguage.googleapis.com`), under that service's terms, which its provider plugin lists.
 * **Anthropic (Claude)** with your own API key, `https://api.anthropic.com/v1/messages` — [Commercial Terms](https://www.anthropic.com/legal/commercial-terms), [Privacy Policy](https://www.anthropic.com/legal/privacy).
 * **OpenAI (ChatGPT)** with your own API key, `https://api.openai.com/v1/responses` — [Services Agreement](https://openai.com/policies/services-agreement/), [Privacy Policy](https://openai.com/policies/row-privacy-policy/), [API data usage](https://openai.com/policies/api-data-usage-policies).
 
@@ -197,6 +197,7 @@ What is sent, and when: the post title and the first 300 words of the post text,
 = 1.2.0 =
 * New: **optional AI slug suggestions**, through the AI connector set up in WordPress 7.0+ (Settings → Connectors) or with your own Claude (Anthropic) or ChatGPT (OpenAI) API key. In the block editor, ask for an English slug that describes the post (طبخة ملوخية → *molokhia-recipe*) or translates the title (*molokhia-dish*); it is used only when you click "Use this slug". Off by default; while off, nothing is sent anywhere.
 * Keys are stored encrypted (or defined in wp-config.php) and never shown again. Suggestions are cached, and a daily limit protects your API bill.
+* Tested with WordPress's AI connectors for Anthropic (Claude) and Google (Gemini), including Gemini's own error answers such as a wrong API key.
 * Every AI answer is checked: only a clean Latin slug (a-z, digits, hyphens, up to 8 words) is accepted, and it is made unique like any WordPress slug.
 * Transliteration is unchanged: no existing site's URLs move, and nothing calls the AI on save.
 

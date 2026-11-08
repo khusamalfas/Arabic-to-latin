@@ -29,7 +29,7 @@ add_action(
 );
 
 /*
- * AI provider mock (suite ai.php). Requests to Anthropic or OpenAI never leave
+ * AI provider mock (AI suites). Requests to Anthropic, OpenAI or Google never leave
  * the test site: they are recorded in the arabic_to_lat_test_ai_log option and
  * answered from arabic_to_lat_test_ai_mock ({code, body} or code "timeout").
  * Only the live test (ATL_TEST_*_KEY set) lets them through.
@@ -37,7 +37,7 @@ add_action(
 add_filter(
 	'pre_http_request',
 	function ( $pre, $args, $url ) {
-		if ( 0 !== strpos( $url, 'https://api.anthropic.com/' ) && 0 !== strpos( $url, 'https://api.openai.com/' ) ) {
+		if ( 0 !== strpos( $url, 'https://api.anthropic.com/' ) && 0 !== strpos( $url, 'https://api.openai.com/' ) && 0 !== strpos( $url, 'https://generativelanguage.googleapis.com/' ) ) {
 			return $pre;
 		}
 		if ( get_option( 'arabic_to_lat_test_ai_live' ) ) {

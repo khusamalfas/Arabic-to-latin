@@ -96,7 +96,7 @@ build_site() {
 	wpq rewrite structure '/%postname%/' --quiet
 	ln -sfn "$PLUGIN" "$SITE/wp-content/plugins/arabic-to-lat"
 	wpq plugin activate arabic-to-lat --quiet || exit 2
-	for slug in woocommerce polylang translatepress-multilingual duplicate-post ai-provider-for-anthropic ai-provider-for-openai; do
+	for slug in woocommerce polylang translatepress-multilingual duplicate-post ai-provider-for-anthropic ai-provider-for-openai ai-provider-for-google; do
 		fetch_plugin "$slug" || echo "  (could not download $slug; suites needing it will be skipped)"
 	done
 	mkdir -p "$SITE/wp-content/mu-plugins"
@@ -125,6 +125,8 @@ reset_site() {
 	wpq site empty --yes --quiet
 	wpq option delete arabic_to_lat_settings polylang --quiet 2>/dev/null
 	wpq eval 'global $wpdb; if ( $wpdb->get_var( "SHOW TABLES LIKE \"{$wpdb->prefix}woocommerce_attribute_taxonomies\"" ) ) { $wpdb->query( "DELETE FROM {$wpdb->prefix}woocommerce_attribute_taxonomies" ); } delete_transient( "wc_attribute_taxonomies" ); delete_transient( "arabic_to_lat_result_1" );' 2>/dev/null
+	# AI state: settings, usage, the suggestion cache, connector keys and the test mock, so no suite sees another's answers.
+	wpq eval 'global $wpdb; $wpdb->query( "DELETE FROM {$wpdb->options} WHERE option_name LIKE \"%arabic\\_to\\_lat\\_ai%\" OR option_name LIKE \"arabic\\_to\\_lat\\_test\\_%\" OR option_name LIKE \"connectors\\_ai\\_%\"" ); wp_cache_flush();' 2>/dev/null
 	wpq rewrite structure '/%postname%/' --quiet
 }
 
