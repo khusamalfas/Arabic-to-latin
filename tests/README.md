@@ -12,6 +12,8 @@ tests/run.sh --wpml=/path/to/sitepress-multilingual-cms   # + WPML (needs Docker
 
 Exit code 0 = all checks passed. Anything else = do not release.
 
+At the end, every full run also runs the official **WordPress Plugin Check** on the plugin (the same check as wordpress.org and CI): errors fail the run, warnings are listed under "Known limitations". Run it alone with `--suite=plugin-check`, skip it with `--no-plugin-check`. It is skipped in GitHub Actions, which has its own Plugin Check job.
+
 Other options: `--suite=titles,http` (some suites only), `--keep` (keep the site and server for debugging; the site is in `tests/.site-<version>`, the server on `http://localhost:8890`).
 
 Needs PHP, WP-CLI, curl, unzip, python3; for `--wpml` also Docker. Nothing touches your own databases: every run builds a fresh SQLite site (WPML: a throwaway MySQL container). Plugin downloads are cached in `tests/.cache/`.
