@@ -4,7 +4,7 @@ Tags: arabic, slug, permalink, transliteration, persian
 Requires at least: 6.4
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 1.1.0
+Stable tag: 1.2.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -240,6 +240,9 @@ What is sent, and when: the post title and the first 300 words of the post text,
 * Initial release.
 
 == Upgrade Notice ==
+
+= 1.2.0 =
+Optional AI slug suggestions (WordPress AI connector, Claude or ChatGPT). Off by default: existing slugs and transliteration are unchanged, and nothing is sent anywhere unless you switch it on.
 
 = 1.0.0 =
 Major update: block editor support with live Latin preview, spelling styles, Persian/Urdu, multilingual, WooCommerce and ACF support, safe batch conversion. Existing slugs are not changed.
