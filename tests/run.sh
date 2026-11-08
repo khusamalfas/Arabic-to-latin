@@ -76,7 +76,14 @@ build_site() {
 	echo "▸ Building WordPress $WP_VERSION on PHP $(php -r 'echo PHP_VERSION;') in $SITE"
 	rm -rf "$SITE"
 	mkdir -p "$SITE"
-	wpq core download --version="$WP_VERSION" --quiet || exit 2
+	# The official .zip, not `wp core download`: its .tar.gz unpacking cuts paths at
+	# 100 characters, which broke 16 files of the WordPress AI Client (WP 7.0+).
+	local core_zip="$CACHE/wordpress-$WP_VERSION.zip" core_url="https://wordpress.org/wordpress-$WP_VERSION.zip"
+	[ "$WP_VERSION" = latest ] && core_url="https://wordpress.org/latest.zip" && rm -f "$core_zip"
+	if [ ! -s "$core_zip" ]; then
+		curl -fsSL -o "$core_zip" "$core_url" || { rm -f "$core_zip"; echo "Could not download WordPress $WP_VERSION"; exit 2; }
+	fi
+	( cd "$SITE" && unzip -q "$core_zip" && mv wordpress/* . && rmdir wordpress ) || exit 2
 	fetch_plugin sqlite-database-integration || exit 2
 	cp "$SITE/wp-content/plugins/sqlite-database-integration/db.copy" "$SITE/wp-content/db.php"
 	sed -i.bak "s#{SQLITE_IMPLEMENTATION_FOLDER_PATH}#$SITE/wp-content/plugins/sqlite-database-integration#; s#{SQLITE_PLUGIN}#sqlite-database-integration/load.php#" "$SITE/wp-content/db.php" && rm -f "$SITE/wp-content/db.php.bak"
@@ -86,7 +93,7 @@ build_site() {
 	wpq rewrite structure '/%postname%/' --quiet
 	ln -sfn "$PLUGIN" "$SITE/wp-content/plugins/arabic-to-lat"
 	wpq plugin activate arabic-to-lat --quiet || exit 2
-	for slug in woocommerce polylang translatepress-multilingual duplicate-post; do
+	for slug in woocommerce polylang translatepress-multilingual duplicate-post ai-provider-for-anthropic ai-provider-for-openai; do
 		fetch_plugin "$slug" || echo "  (could not download $slug; suites needing it will be skipped)"
 	done
 	mkdir -p "$SITE/wp-content/mu-plugins"

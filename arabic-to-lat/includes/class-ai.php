@@ -10,15 +10,21 @@ namespace ArabicToLat;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Suggests an English slug that describes a post, using the site owner's own
- * API key. Off by default; nothing here runs on save, and a suggestion is only
- * used when an author picks it in the editor.
+ * Suggests an English slug that describes a post, through the AI connector set
+ * up in WordPress (Settings → Connectors, WordPress 7.0+) or with the site
+ * owner's own Claude or ChatGPT key. Off by default; nothing here runs on save,
+ * and a suggestion is only used when an author picks it in the editor.
  */
 final class AI {
 
 	const OPTION = 'arabic_to_lat_ai';
 	const USAGE  = 'arabic_to_lat_ai_usage';
 	const CACHE  = 'arabic_to_lat_ai_';
+
+	/**
+	 * Provider value for "use the WordPress AI Client".
+	 */
+	const WORDPRESS = 'wordpress';
 
 	/**
 	 * wp-config.php constants that, when defined, replace the stored key.
@@ -63,9 +69,15 @@ final class AI {
 		$saved  = is_array( $saved ) ? $saved : array();
 		$models = self::models();
 
+		// Default: the site's own AI connector where WordPress has one (7.0+), else Claude.
+		$provider = self::wordpress_client_exists() ? self::WORDPRESS : 'anthropic';
+		if ( isset( $saved['provider'] ) && ( isset( $models[ $saved['provider'] ] ) || self::WORDPRESS === $saved['provider'] ) ) {
+			$provider = $saved['provider'];
+		}
+
 		$settings = array(
 			'enabled'         => ! empty( $saved['enabled'] ),
-			'provider'        => isset( $saved['provider'] ) && isset( $models[ $saved['provider'] ] ) ? $saved['provider'] : 'anthropic',
+			'provider'        => $provider,
 			'model_anthropic' => isset( $saved['model_anthropic'] ) ? (string) $saved['model_anthropic'] : '',
 			'model_openai'    => isset( $saved['model_openai'] ) ? (string) $saved['model_openai'] : '',
 			'key_anthropic'   => isset( $saved['key_anthropic'] ) ? (string) $saved['key_anthropic'] : '',
@@ -83,11 +95,46 @@ final class AI {
 	}
 
 	/**
-	 * Enabled and a key is available for the chosen provider.
+	 * Enabled, and either a key is available for the chosen provider or the
+	 * WordPress AI Client is chosen and allowed. Whether a connector is set up
+	 * is not checked here: that can cost an HTTP call, and this runs on every
+	 * editor load. A missing connector is reported when the author asks.
 	 */
 	public static function is_ready() {
 		$settings = self::settings();
-		return $settings['enabled'] && '' !== self::key( $settings['provider'] );
+		if ( ! $settings['enabled'] ) {
+			return false;
+		}
+		if ( self::WORDPRESS === $settings['provider'] ) {
+			return self::wordpress_client_available();
+		}
+		return '' !== self::key( $settings['provider'] );
+	}
+
+	/**
+	 * WordPress 7.0+ ships the AI Client (wp_ai_client_prompt()).
+	 */
+	public static function wordpress_client_exists() {
+		return function_exists( 'wp_ai_client_prompt' );
+	}
+
+	/**
+	 * The AI Client exists and AI is not switched off for this site
+	 * (WP_AI_SUPPORT constant or the wp_supports_ai filter).
+	 */
+	public static function wordpress_client_available() {
+		return self::wordpress_client_exists() && ( ! function_exists( 'wp_supports_ai' ) || wp_supports_ai() );
+	}
+
+	/**
+	 * Whether a connector can answer a text prompt. May call the provider's
+	 * model list, so only for the settings page.
+	 */
+	public static function wordpress_connector_ready() {
+		if ( ! self::wordpress_client_available() ) {
+			return false;
+		}
+		return true === wp_ai_client_prompt( 'test' )->is_supported_for_text_generation();
 	}
 
 	/**
@@ -189,9 +236,16 @@ final class AI {
 		}
 
 		$provider = $settings['provider'];
-		$key      = self::key( $provider );
-		if ( '' === $key ) {
-			return new \WP_Error( 'ai_no_key', __( 'Add an API key in Settings → Arabic to Latin to get AI slug suggestions.', 'arabic-to-lat' ), array( 'status' => 400 ) );
+		$key      = '';
+		if ( self::WORDPRESS === $provider ) {
+			if ( ! self::wordpress_client_exists() ) {
+				return new \WP_Error( 'ai_no_wordpress_client', __( 'This WordPress version has no AI connectors. Choose Claude or ChatGPT with your own key in Settings → Arabic to Latin.', 'arabic-to-lat' ), array( 'status' => 400 ) );
+			}
+		} else {
+			$key = self::key( $provider );
+			if ( '' === $key ) {
+				return new \WP_Error( 'ai_no_key', __( 'Add an API key in Settings → Arabic to Latin to get AI slug suggestions.', 'arabic-to-lat' ), array( 'status' => 400 ) );
+			}
 		}
 
 		$title = self::clean_text( isset( $input['title'] ) ? (string) $input['title'] : '', 60 );
@@ -200,7 +254,8 @@ final class AI {
 		}
 		$text  = self::clean_text( isset( $input['content'] ) ? (string) $input['content'] : '', 300 );
 		$style = isset( $input['style'] ) && in_array( $input['style'], array( 'describe', 'translate' ), true ) ? $input['style'] : $settings['style'];
-		$model = $settings[ 'model_' . $provider ];
+		// With the WordPress AI Client, the connector picks the model.
+		$model = self::WORDPRESS === $provider ? '' : $settings[ 'model_' . $provider ];
 
 		$cache_key = self::CACHE . md5( wp_json_encode( array( $provider, $model, $style, $title, $text ) ) );
 		if ( empty( $input['no_cache'] ) ) {
@@ -219,7 +274,9 @@ final class AI {
 			return new \WP_Error( 'ai_daily_limit', __( 'The daily limit for AI slug suggestions is reached. It resets tomorrow, or raise it in Settings → Arabic to Latin.', 'arabic-to-lat' ), array( 'status' => 429 ) );
 		}
 
-		$raw = AI_Provider::request( $provider, $key, $model, self::system_prompt( $style ), self::user_message( $title, $text ) );
+		$raw = self::WORDPRESS === $provider
+			? AI_Provider::wordpress_request( self::system_prompt( $style ), self::user_message( $title, $text ) )
+			: AI_Provider::request( $provider, $key, $model, self::system_prompt( $style ), self::user_message( $title, $text ) );
 		if ( is_wp_error( $raw ) ) {
 			return $raw;
 		}
@@ -406,9 +463,21 @@ final class AI {
 			'arabicToLatAI',
 			array(
 				'style'    => $settings['style'],
-				'provider' => 'openai' === $settings['provider'] ? 'ChatGPT' : 'Claude',
+				'provider' => self::provider_label( $settings['provider'] ),
 			)
 		);
+	}
+
+	/**
+	 * Name shown on the editor button ("Suggest with …").
+	 *
+	 * @param string $provider anthropic|openai|wordpress.
+	 */
+	public static function provider_label( $provider ) {
+		if ( self::WORDPRESS === $provider ) {
+			return __( 'AI', 'arabic-to-lat' );
+		}
+		return 'openai' === $provider ? 'ChatGPT' : 'Claude';
 	}
 
 	/**
@@ -422,7 +491,7 @@ final class AI {
 			'Arabic to Latin',
 			wp_kses_post(
 				wpautop(
-					__( 'When AI slug suggestions are switched on and an author asks for a suggestion in the editor, this site sends the post title and the first 300 words of the post text to the AI provider chosen in Settings → Arabic to Latin (Anthropic for Claude, or OpenAI for ChatGPT), using the site owner\'s API key. Nothing is sent automatically, and no visitor data is sent.', 'arabic-to-lat' )
+					__( 'When AI slug suggestions are switched on and an author asks for a suggestion in the editor, this site sends the post title and the first 300 words of the post text to the AI provider chosen in Settings → Arabic to Latin: the AI service set up in Settings → Connectors, or Anthropic (Claude) or OpenAI (ChatGPT) with the site owner\'s API key. Nothing is sent automatically, and no visitor data is sent.', 'arabic-to-lat' )
 				)
 			)
 		);

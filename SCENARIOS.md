@@ -164,3 +164,9 @@ The site owner adds their own Claude (Anthropic) or ChatGPT (OpenAI) API key. In
 | K16 | Uninstall | AI settings and stored key deleted | 4×2=8 | `ai.php` | ✅ |
 | K17 | Privacy: owner needs to know what leaves the site | Settings and readme say what is sent, to whom, when; WordPress privacy guide text added | 4×3=12 | `ai.php` + readme | ✅ |
 | K18 | Live call with a real key (optional, only when `ATL_TEST_ANTHROPIC_KEY` / `ATL_TEST_OPENAI_KEY` is set) | Real slug for طبخة ملوخية is Latin, short, describes the dish | 3×2=6 | `ai.php` (skipped without key) | skipped without a key |
+| K19 | WordPress 7.0+ has its own AI connectors (Settings → Connectors); older WordPress has none | 7.0+: "WordPress AI connector" offered and the default. Before 7.0: not shown, cannot be saved, a stored value gives a plain error | 4×4=16 | `ai.php` + `ai-connectors.php` | ✅ |
+| K20 | Connector chosen, but none set up in Settings → Connectors | Clear "no AI connector" message with a link; nothing sent; our own saved key not used instead | 4×3=12 | `ai-connectors.php` | ✅ |
+| K21 | Connector set up (official Anthropic provider plugin) | Suggestion goes through `wp_ai_client_prompt()` with the connector's key, same instructions, delimiters and JSON schema; settings page says "Ready" | 4×3=12 | `ai-connectors.php` | ✅ |
+| K22 | Provider errors through the connector (401, 429, 529, timeout) | Own plain messages; WordPress passes the provider's text (which can contain the key) in its errors, so it is never shown | 5×2=10 | `ai-connectors.php` | ✅ |
+| K23 | Editor load with the connector chosen | Panel loads ("Suggest with AI") without asking the provider anything: checking a connector can cost an HTTP call per page | 4×4=16 | `ai-connectors.php` | ✅ |
+| K24 | Site switched AI off (`WP_AI_SUPPORT` false or `wp_supports_ai` filter) | No panel; a request gets a plain "AI is switched off" message; nothing sent | 3×2=6 | `ai-connectors.php` | ✅ |
