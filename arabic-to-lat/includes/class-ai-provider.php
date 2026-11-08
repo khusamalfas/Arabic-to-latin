@@ -91,6 +91,9 @@ final class AI_Provider {
 	 * @return string|\WP_Error JSON text from the model.
 	 */
 	public static function wordpress_request( $system, $user ) {
+		if ( ! function_exists( 'wp_ai_client_prompt' ) ) {
+			return new \WP_Error( 'ai_no_wordpress_client', __( 'This WordPress version has no AI connectors. Choose Claude or ChatGPT with your own key in Settings → Arabic to Latin.', 'arabic-to-lat' ), array( 'status' => 400 ) );
+		}
 		$text = wp_ai_client_prompt( $user )
 			->using_system_instruction( $system )
 			->using_max_tokens( self::MAX_TOKENS )
