@@ -29,7 +29,8 @@ t_check( 'D1', 'Attachment title stays Arabic', $attachment ? $attachment->post_
 t_check( 'D1', 'Attachment page slug Latin', $attachment ? $attachment->post_name : null, 'sura-jmila' );
 
 t_check( 'D2', 'Name with no letters (؟.jpg) keeps WordPress behaviour', sanitize_file_name( '؟.jpg' ), t_without_plugin( function () { return sanitize_file_name( '؟.jpg' ); } ) );
-t_check( 'D3', 'Several dots', sanitize_file_name( 'صورة.نسخة.jpg' ), 'sura.nskha.jpg' );
+// Since 1.2.1 inner parts get WordPress's own treatment, as photo.copy.jpg → photo.copy_.jpg (see E13).
+t_check( 'D3', 'Several dots: same rule as WordPress for Latin names', array( sanitize_file_name( 'صورة.نسخة.jpg' ), sanitize_file_name( 'photo.copy.jpg' ) ), array( 'sura.nskha_.jpg', 'photo.copy_.jpg' ) );
 t_check( 'D4', 'Uppercase extension kept', sanitize_file_name( 'صورة.JPG' ), 'sura.JPG' );
 
 list( $again ) = $upload( 'صورة جميلة.jpg' );

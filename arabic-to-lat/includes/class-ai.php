@@ -270,7 +270,11 @@ final class AI {
 			}
 		}
 
-		if ( ! self::take_daily_quota( $settings['daily_limit'] ) ) {
+		$quota = self::take_daily_quota( $settings['daily_limit'] );
+		if ( 'user' === $quota ) {
+			return new \WP_Error( 'ai_user_daily_limit', __( 'You have reached your daily limit for AI slug suggestions. It resets tomorrow.', 'arabic-to-lat' ), array( 'status' => 429 ) );
+		}
+		if ( true !== $quota ) {
 			return new \WP_Error( 'ai_daily_limit', __( 'The daily limit for AI slug suggestions is reached. It resets tomorrow, or raise it in Settings → Arabic to Latin.', 'arabic-to-lat' ), array( 'status' => 429 ) );
 		}
 
@@ -362,15 +366,38 @@ final class AI {
 	private static function take_daily_quota( $limit ) {
 		$today = gmdate( 'Y-m-d' );
 		$usage = get_option( self::USAGE, array() );
-		$count = is_array( $usage ) && isset( $usage['day'], $usage['count'] ) && $today === $usage['day'] ? (int) $usage['count'] : 0;
+		$fresh = is_array( $usage ) && isset( $usage['day'], $usage['count'] ) && $today === $usage['day'];
+		$count = $fresh ? (int) $usage['count'] : 0;
+		$users = $fresh && isset( $usage['users'] ) && is_array( $usage['users'] ) ? $usage['users'] : array();
 		if ( $limit > 0 && $count >= $limit ) {
 			return false;
 		}
+
+		// Per-user cap, so one account (a contributor, say) cannot use up the site's
+		// budget, and the cost stays bounded even with "no limit". Administrators and
+		// WP-CLI are not capped.
+		$user_id = get_current_user_id();
+		if ( $user_id && ! user_can( $user_id, 'manage_options' ) ) {
+			/**
+			 * Filters how many paid AI requests one non-administrator may make per day.
+			 *
+			 * @param int $per_user Default 25; 0 = no per-user cap.
+			 * @param int $user_id  User asking.
+			 */
+			$per_user = max( 0, (int) apply_filters( 'arabic_to_lat_ai_user_daily_limit', 25, $user_id ) );
+			$mine     = isset( $users[ $user_id ] ) ? (int) $users[ $user_id ] : 0;
+			if ( $per_user > 0 && $mine >= $per_user ) {
+				return 'user';
+			}
+			$users[ $user_id ] = $mine + 1;
+		}
+
 		update_option(
 			self::USAGE,
 			array(
 				'day'   => $today,
 				'count' => $count + 1,
+				'users' => $users,
 			),
 			false
 		);

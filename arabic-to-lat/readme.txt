@@ -4,7 +4,7 @@ Tags: arabic, slug, permalink, transliteration, persian
 Requires at least: 6.4
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 1.2.0
+Stable tag: 1.2.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -194,6 +194,12 @@ What is sent, and when: the post title and the first 300 words of the post text,
 
 == Changelog ==
 
+= 1.2.1 =
+* Security: uploaded file names are cleaned again with WordPress's own rules after transliteration. Before, a user allowed to upload files (author and above) could craft a name that placed the file outside the uploads folder, or kept an executable inner extension such as .php. that WordPress normally neutralises. Update recommended.
+* Security: each non-administrator now has a daily cap for paid AI suggestions (default 25, filter `arabic_to_lat_ai_user_daily_limit`), so one account cannot use up the site's AI budget.
+* File names with several dots now get the same treatment as in WordPress: صورة.نسخة.jpg becomes sura.nskha_.jpg, like photo.copy.jpg becomes photo.copy_.jpg.
+* Fixed a PHP warning in old-URL redirects when a page's parent had been deleted.
+
 = 1.2.0 =
 * New: **optional AI slug suggestions**, through the AI connector set up in WordPress 7.0+ (Settings → Connectors) or with your own Claude (Anthropic) or ChatGPT (OpenAI) API key. In the block editor, ask for an English slug that describes the post (طبخة ملوخية → *molokhia-recipe*) or translates the title (*molokhia-dish*); it is used only when you click "Use this slug". Off by default; while off, nothing is sent anywhere.
 * Keys are stored encrypted (or defined in wp-config.php) and never shown again. Suggestions are cached, and a daily limit protects your API bill.
@@ -241,6 +247,9 @@ What is sent, and when: the post title and the first 300 words of the post text,
 * Initial release.
 
 == Upgrade Notice ==
+
+= 1.2.1 =
+Security fix for uploaded file names (users with upload rights). Update recommended.
 
 = 1.2.0 =
 Optional AI slug suggestions (WordPress AI connector, Claude or ChatGPT). Off by default: existing slugs and transliteration are unchanged, and nothing is sent anywhere unless you switch it on.

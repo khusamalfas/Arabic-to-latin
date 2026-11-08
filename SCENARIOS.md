@@ -60,7 +60,7 @@ Every row is an action or input a real site can produce, the behaviour we promis
 |---|---|---|---|---|---|
 | D1 | Upload `صورة جميلة.jpg` | File `sura-jmila.jpg`; title stays Arabic | 3×5=15 | `media.php` | ✅ |
 | D2 | Upload `؟.jpg` (no letters) | Original name kept, no `.jpg` without base | 2×1=2 | `media.php` | ✅ |
-| D3 | Multiple dots `صورة.نسخة.jpg` | `sura.nskha.jpg` | 2×2=4 | `media.php` | ✅ |
+| D3 | Multiple dots `صورة.نسخة.jpg` | `sura.nskha_.jpg`, the same rule WordPress applies to `photo.copy.jpg` (since 1.2.1, see E13) | 2×2=4 | `media.php` | ✅ |
 | D4 | Uppercase extension `صورة.JPG` | Extension kept | 2×3=6 | `media.php` | ✅ |
 | D5 | Same Arabic file name uploaded twice | Second gets `-1` (WordPress) | 2×4=8 | `media.php` | ✅ |
 | D6 | English file name | Untouched | 3×5=15 | `media.php` | ✅ |
@@ -84,6 +84,8 @@ Every row is an action or input a real site can produce, the behaviour we promis
 | E9 | Plugin **deactivated** after converting | Converted slugs stay; posts still redirect (core); pages and terms stop redirecting. Documented | 4×2=8 | `lifecycle.php` | ✅ (+ documented limitation) |
 | E10 | Plugin **uninstalled** | Settings removed; old-slug records kept | 3×2=6 | `lifecycle.php` | ✅ |
 | E11 | Upgrade from 0.3 (`atl_table` filter in theme) | Filter still applied | 2×1=2 | `settings.php` | ✅ |
+| E13 | Author uploads `evil.پهپ.jpg` (Arabic letters spelling "php" in a middle extension) | Never stored as `evil.php.jpg`: WordPress's own `.php_.` protection applies to the transliterated name (security fix 1.2.1; found in the 2026-11-08 review) | 5×2=10 | `security.php` | ✅ |
+| E14 | Author uploads `／‥／‥／ﻻx.jpg` (full-width slash and dots next to an Arabic ligature; Unicode normalisation turns them into `/` and `..`) | File stays in the uploads folder; no path characters in the name (security fix 1.2.1: path traversal) | 5×3=15 | `security.php` | ✅ |
 
 ## F. Redirects from converted URLs
 
@@ -172,3 +174,4 @@ The site owner adds their own Claude (Anthropic) or ChatGPT (OpenAI) API key. In
 | K24 | Site switched AI off (`WP_AI_SUPPORT` false or `wp_supports_ai` filter) | No panel; a request gets a plain "AI is switched off" message; nothing sent | 3×2=6 | `ai-connectors.php` | ✅ |
 | K25 | Connector is Google Gemini (official `ai-provider-for-google` plugin) | Suggestion goes to `generativelanguage.googleapis.com` with the connector's key (`X-Goog-Api-Key`), our instructions as `systemInstruction`, JSON output with our schema | 3×2=6 | `ai-connector-google.php` | ✅ |
 | K26 | Gemini's own failures: wrong key answered with HTTP 400 `API_KEY_INVALID`, quota 429, overloaded 503, safety block with no content, answer cut off | "Check the key in Settings → Connectors" for a wrong key (not a generic "not accepted"); plain messages otherwise; Google's text and the key never shown | 4×2=8 | `ai-connector-google.php` | ✅ |
+| K27 | A contributor (or any non-admin) sends many new titles to the AI endpoint | Stopped at a per-user daily cap (default 25, filter `arabic_to_lat_ai_user_daily_limit`), also when the site-wide limit is 0; admins and WP-CLI not capped; cached answers still served (security fix 1.2.1) | 3×2=6 | `ai.php` | ✅ |

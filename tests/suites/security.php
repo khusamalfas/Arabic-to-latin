@@ -1,5 +1,5 @@
 <?php
-// Scenarios E5–E8: permissions, nonces, the no-JavaScript fallback.
+// Scenarios E5–E8 and E13: permissions, nonces, the no-JavaScript fallback, unsafe upload names.
 require __DIR__ . '/../lib/bootstrap.php';
 
 $legacy = t_without_plugin( function () { return wp_insert_post( array( 'post_title' => 'مقالة قديمة', 'post_status' => 'publish' ) ); } );
@@ -56,3 +56,45 @@ $author = t_user( 'author' );
 $cookie = t_login( $author );
 $r      = t_http( $endpoint, array( 'cookies' => $cookie, 'headers' => array( 'X-WP-Nonce' => wp_create_nonce( 'wp_rest' ) ) ) );
 t_check( 'E8', 'Author: slug returned', array( $r['code'], json_decode( $r['body'], true ) ), array( 200, array( 'slug' => 'mrhba' ) ) );
+
+// E13: an Arabic-spelled executable extension in the middle of a file name
+// (evil.پهپ.jpg) must not become evil.php.jpg: WordPress itself turns
+// evil.php.jpg into evil.php_.jpg, and transliteration must not undo that.
+$upload_as_author = function ( $name ) use ( $author ) {
+	wp_set_current_user( $author );
+	$img = imagecreatetruecolor( 4, 4 );
+	ob_start();
+	imagejpeg( $img );
+	$jpeg = ob_get_clean();
+	$req  = new WP_REST_Request( 'POST', '/wp/v2/media' );
+	$req->set_header( 'Content-Type', 'image/jpeg' );
+	$req->set_header( 'Content-Disposition', 'attachment; filename="' . $name . '"' );
+	$req->set_body( $jpeg );
+	$res = rest_do_request( $req );
+	$data = $res->get_data();
+	wp_set_current_user( 1 );
+	return array( $res->get_status(), isset( $data['id'] ) ? basename( (string) get_attached_file( $data['id'] ) ) : '' );
+};
+foreach ( array( 'evil.پهپ.jpg' => 'php', 'evil.پهتمل.jpg' => 'phtml', 'evil.ﭘﻬﭗ.jpg' => 'php (presentation forms)' ) as $name => $what ) {
+	list( $status, $stored ) = $upload_as_author( $name );
+	t_true( 'E13', "Author upload: Arabic-spelled .$what. is not left as an executable middle extension", 201 === $status && ! preg_match( '/\.(php|phtml|phar|pht|php\d)\./i', $stored ), "$status $stored" );
+}
+t_check( 'E13', 'Same as WordPress for a Latin name: evil.php.jpg', sanitize_file_name( 'evil.php.jpg' ), 'evil.php_.jpg' );
+t_check( 'E13', 'Normal Arabic file names still transliterated', array( sanitize_file_name( 'صورة.jpg' ), sanitize_file_name( 'صورة المنتج.png' ) ), array( 'sura.jpg', 'sura-almntj.png' ) );
+
+// E14: path characters produced by transliteration (full-width ／ and ‥ next to an
+// Arabic ligature) must never reach the stored file path.
+require_once ABSPATH . 'wp-admin/includes/file.php';
+$uploads = wp_upload_dir();
+foreach ( array( '／‥／‥／ﻻx.jpg', '‥／‥／‥／ﻻ．jpg．jpg', '＼‥＼ﻻx.jpg' ) as $name ) {
+	wp_set_current_user( $author );
+	$tmp = wp_tempnam( 'atl' );
+	imagejpeg( imagecreatetruecolor( 4, 4 ), $tmp );
+	$upload = array( 'name' => $name, 'type' => 'image/jpeg', 'tmp_name' => $tmp, 'error' => 0, 'size' => filesize( $tmp ) );
+	$r      = wp_handle_sideload( $upload, array( 'test_form' => false ) );
+	wp_set_current_user( 1 );
+	$file = isset( $r['file'] ) ? $r['file'] : '';
+	// Refused by WordPress (no real extension) is as safe as stored in the uploads folder.
+	t_true( 'E14', "Upload '$name' refused or kept in the uploads folder", isset( $r['error'] ) || ( '' !== $file && dirname( $file ) === $uploads['path'] && false === strpos( $file, '..' ) ), $file ? $file : wp_json_encode( $r ) );
+	t_true( 'E14', "sanitize_file_name('$name') has no path characters", ! preg_match( '#[/\\\\]|\.\.#', sanitize_file_name( $name ) ), sanitize_file_name( $name ) );
+}

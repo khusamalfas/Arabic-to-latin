@@ -367,7 +367,9 @@ final class Plugin {
 	 * @param string $filename_raw Original file name.
 	 */
 	public function sanitize_file_name( $filename, $filename_raw = '' ) {
-		if ( ! Transliterator::has_arabic( $filename ) ) {
+		// The nested sanitize_file_name() call below runs this filter again; never transliterate twice.
+		static $cleaning = false;
+		if ( $cleaning || ! Transliterator::has_arabic( $filename ) ) {
 			return $filename;
 		}
 
@@ -380,6 +382,17 @@ final class Plugin {
 		$converted = preg_replace( '/[\s-]+/', '-', $converted );
 		$converted = preg_replace( '/-*\.-*/', '.', $converted );
 		$converted = trim( $converted, '-' );
+
+		// WordPress has already cleaned the name before this filter, but transliteration
+		// (NFKC: ／ → /, ‥ → ..) and Arabic-spelled extensions (پهپ → php) can bring back
+		// what it removed. Clean the Latin result again with WordPress's own rules: no path
+		// characters, and inner extensions like .php. neutralised (evil.php_.jpg).
+		$cleaning  = true;
+		$converted = sanitize_file_name( $converted );
+		$cleaning  = false;
+		if ( '' === $converted || wp_basename( $converted ) !== $converted ) {
+			return $filename;
+		}
 
 		// Nothing usable left in front of the extension (e.g. a name made only of punctuation).
 		if ( '' === $converted || '.' === $converted[0] ) {
@@ -536,7 +549,7 @@ final class Plugin {
 			$score = 0;
 			if ( '' === $parent_slug ) {
 				$score = $post->post_parent ? 0 : 1;
-			} elseif ( $post->post_parent ) {
+			} elseif ( $post->post_parent && get_post( $post->post_parent ) ) {
 				$parent = get_post( $post->post_parent );
 				$names  = array_merge( array( $parent->post_name ), get_post_meta( $parent->ID, '_wp_old_slug' ) );
 				$score  = in_array( $parent_slug, $names, true ) ? 2 : 1;
