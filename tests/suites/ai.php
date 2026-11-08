@@ -299,6 +299,24 @@ foreach ( array( 'anthropic' => 'ATL_TEST_ANTHROPIC_KEY', 'openai' => 'ATL_TEST_
 	}
 }
 
+// K27: one account cannot use up the site's AI budget (found in the 2026-11-08 security review).
+$configure( array( 'daily_limit' => 0 ) );
+$mock( 200, $claude_answer( '{"slug":"per-user"}' ) );
+$contributor = t_user( 'contributor' );
+add_filter( 'arabic_to_lat_ai_user_daily_limit', function () { return 2; } );
+wp_set_current_user( $contributor );
+$got = array();
+foreach ( array( 'مستخدم 1', 'مستخدم 2', 'مستخدم 3' ) as $title ) {
+	$got[] = $code_of( AI::suggest( array( 'title' => $title ) ) );
+}
+t_check( 'K27', 'Contributor stopped at the per-user cap, even with no site-wide limit', $got, array( 'ok:per-user', 'ok:per-user', 'ai_user_daily_limit' ) );
+t_check( 'K27', 'Capped request not sent', count( $log() ), 2 );
+t_check( 'K27', 'Cached answers still served after the cap', $code_of( AI::suggest( array( 'title' => 'مستخدم 1' ) ) ), 'ok:per-user' );
+wp_set_current_user( 1 );
+t_check( 'K27', 'Administrator not capped', $code_of( AI::suggest( array( 'title' => 'مستخدم 4' ) ) ), 'ok:per-user' );
+remove_all_filters( 'arabic_to_lat_ai_user_daily_limit' );
+$log();
+
 // K16: uninstall removes AI settings, key, counter and cache (last: it uninstalls).
 $configure();
 $mock( 200, $claude_answer( '{"slug":"before-uninstall"}' ) );
