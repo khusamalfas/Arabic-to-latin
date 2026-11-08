@@ -521,6 +521,14 @@ final class Admin {
 				</p>
 			</form>
 
+			<?php
+			/**
+			 * Fires after the converter sections of Settings → Arabic to Latin.
+			 * The optional AI section renders here.
+			 */
+			do_action( 'arabic_to_lat_settings_after' );
+			?>
+
 			<h2><?php esc_html_e( 'Default table', 'arabic-to-lat' ); ?></h2>
 			<details>
 				<summary><?php esc_html_e( 'Show all default replacements', 'arabic-to-lat' ); ?></summary>
