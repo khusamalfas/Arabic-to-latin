@@ -118,7 +118,13 @@ final class AI_Provider {
 					? new \WP_Error( 'ai_timeout', __( 'The AI provider did not answer in time. Try again in a moment.', 'arabic-to-lat' ), array( 'status' => 504 ) )
 					: new \WP_Error( 'ai_network', __( 'This site could not reach the AI provider. Check that the server can make outgoing HTTPS requests.', 'arabic-to-lat' ), array( 'status' => 502 ) );
 		}
-		if ( 401 === $status || 403 === $status ) {
+		// The response could not be read, e.g. Gemini blocked the answer for safety and sent no content.
+		if ( 'prompt_builder_error' === $code ) {
+			return self::invalid();
+		}
+		// Gemini answers a wrong key with HTTP 400 "API_KEY_INVALID". The text is only inspected here, never shown.
+		$bad_key = 400 === $status && ( false !== stripos( $text->get_error_message(), 'API_KEY_INVALID' ) || false !== stripos( $text->get_error_message(), 'API key not valid' ) );
+		if ( 401 === $status || 403 === $status || $bad_key ) {
 			return new \WP_Error( 'ai_key_rejected', __( 'The AI provider rejected the API key. Check it in Settings → Connectors.', 'arabic-to-lat' ), array( 'status' => 502 ) );
 		}
 		if ( $status >= 400 ) {
