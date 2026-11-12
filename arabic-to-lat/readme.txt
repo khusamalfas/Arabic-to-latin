@@ -162,11 +162,24 @@ No. It runs in short batches with a progress bar until everything is done, and y
 
 = How do the AI slug suggestions work? =
 
-In Settings → Arabic to Latin → AI slug suggestions, switch them on and choose where the AI comes from: on WordPress 7.0 and later, the **WordPress AI connector** uses the AI service you already set up in Settings → Connectors (tested with the official providers for Anthropic Claude and Google Gemini), with no key to paste here; on any version you can instead choose Claude or ChatGPT and paste your own API key. In the block editor a panel "English slug (AI)" appears: click "Suggest", and the post title and the start of the post are sent to the provider, which answers with a short English slug. Nothing changes until you click "Use this slug", and you can still edit it. While they are switched off, nothing is sent anywhere.
+They suggest an English slug that says what the page is about, instead of a letter-by-letter transliteration. For طبخة ملوخية the normal slug is *tbkha-mlukhiya*; the AI suggests *molokhia-recipe* (style "Describe the post": the words people search for) or *molokhia-dish* (style "Translate the title"). Names of people, places and dishes keep their usual Latin spelling.
+
+To use it, go to Settings → Arabic to Latin → AI slug suggestions, switch it on and choose where the AI comes from. On WordPress 7.0 and later, the **WordPress AI connector** uses the AI service you already set up in Settings → Connectors (tested with the official providers for Anthropic Claude and Google Gemini), with no key to paste here. On any version you can instead choose Claude or ChatGPT and paste your own API key.
+
+In the block editor a panel "English slug (AI)" appears: click "Suggest", and the post title and the start of the post are sent to the provider. Nothing changes until you click "Use this slug", and you can still edit it. While the feature is switched off, nothing is sent anywhere.
 
 = What do AI suggestions cost, and can they run up my bill? =
 
-Each suggestion is one small request on your own API account, usually a fraction of a cent. The same post and title are answered from a cache for free, and a daily limit (100 by default) stops requests until the next day.
+You pay your AI provider per request; the plugin itself is free. One suggestion sends the title and up to 300 words of the post (about 500 to 1,800 tokens) and gets a short answer back. At the providers' list prices on 12 November 2026, one suggestion costs roughly:
+
+* Claude Haiku 5.5 or GPT-6 Luna: less than 0.05 cent
+* Claude Sonnet 5.5 or GPT-6.1 Sol: 0.3 to 0.9 cent
+* Claude Opus 5.5 (the default for Claude): 0.6 to 1.7 cents
+* GPT-6 Astra (the default for ChatGPT): 1.6 to 4.3 cents
+
+Prices change: check [Anthropic's pricing](https://platform.claude.com/docs/en/about-claude/pricing) and [OpenAI's pricing](https://developers.openai.com/api/docs/pricing). With the WordPress AI connector, the cost depends on the service and model set up there.
+
+To keep the bill predictable, asking again for the same title and text is answered from a cache for free, a daily limit (100 requests by default, changeable in the settings) stops requests until the next day, and each user who is not an administrator can make at most 25 paid requests a day. At the default limit, even the most expensive model stays under about $5 a day.
 
 = Where is my API key stored? =
 

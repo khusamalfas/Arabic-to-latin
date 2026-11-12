@@ -124,7 +124,7 @@ final class AI_Admin {
 		?>
 		<h2 id="atl-ai"><?php esc_html_e( 'AI slug suggestions (optional)', 'arabic-to-lat' ); ?></h2>
 		<p><?php esc_html_e( 'With an AI service, authors can ask for an English slug that describes the post, for example طبخة ملوخية → molokhia-recipe. The suggestion appears in the block editor and is only used when the author picks it. Nothing runs automatically, and transliteration keeps working without AI.', 'arabic-to-lat' ); ?></p>
-		<p class="description"><?php esc_html_e( 'Privacy: when an author asks for a suggestion, the post title and the first 300 words of the post are sent to the AI service you choose below. Each request uses your own AI account and costs a fraction of a cent.', 'arabic-to-lat' ); ?></p>
+		<p class="description"><?php esc_html_e( 'Privacy: when an author asks for a suggestion, the post title and the first 300 words of the post are sent to the AI service you choose below. Each request uses your own AI account and costs from a fraction of a cent to a few cents, depending on the model (see the FAQ on the plugin page).', 'arabic-to-lat' ); ?></p>
 
 		<?php if ( is_array( $test ) ) : ?>
 			<?php if ( isset( $test['error'] ) ) : ?>
