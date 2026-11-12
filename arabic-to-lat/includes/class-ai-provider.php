@@ -18,9 +18,15 @@ defined( 'ABSPATH' ) || exit;
  */
 final class AI_Provider {
 
-	const ANTHROPIC_URL     = 'https://api.anthropic.com/v1/messages';
+	/*
+	 * Direct provider calls are intentional. On WordPress 7.0+ the default path is the WordPress
+	 * AI Client (wordpress_request()); these endpoints serve sites on WordPress 6.4–6.9, which
+	 * have no AI Client, and owners who choose to keep their own key in this plugin's settings.
+	 * Both are documented in readme.txt under "External services".
+	 */
+	const ANTHROPIC_URL     = 'https://api.anthropic.com/v1/messages'; // phpcs:ignore PluginCheck.CodeAnalysis.AIProvider.DirectIntegration -- Fallback for WP < 7.0 and owner-chosen own key; see above.
 	const ANTHROPIC_VERSION = '2026-10-21';
-	const OPENAI_URL        = 'https://api.openai.com/v1/responses';
+	const OPENAI_URL        = 'https://api.openai.com/v1/responses'; // phpcs:ignore PluginCheck.CodeAnalysis.AIProvider.DirectIntegration -- Fallback for WP < 7.0 and owner-chosen own key; see above.
 	const TIMEOUT           = 25;
 	const MAX_TOKENS        = 2048;
 
