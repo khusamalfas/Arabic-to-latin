@@ -167,6 +167,12 @@ foreach ( array(
 	t_check( 'K7', "HTTP $code → $want", $code_of( $r ), $want );
 	t_true( 'K7', "HTTP $code: provider text and key not in the message", is_wp_error( $r ) && false === strpos( $r->get_error_message(), 'sk-' ), is_wp_error( $r ) ? $r->get_error_message() : '' );
 }
+// K7: OpenAI sends "no credit left" as HTTP 429 insufficient_quota; that is a billing problem, not "wait a minute".
+$configure( array( 'provider' => 'openai' ) );
+$mock( 429, array( 'error' => array( 'message' => 'You exceeded your current quota.', 'type' => 'insufficient_quota', 'code' => 'insufficient_quota' ) ) );
+t_check( 'K7', 'ChatGPT HTTP 429 insufficient_quota → ai_billing', $code_of( AI::suggest( array( 'title' => 'طبخة ملوخية quota' ) ) ), 'ai_billing' );
+$mock( 429, array( 'error' => array( 'message' => 'Rate limit reached.', 'type' => 'rate_limit_exceeded', 'code' => 'rate_limit_exceeded' ) ) );
+t_check( 'K7', 'ChatGPT HTTP 429 rate limit stays ai_rate_limited', $code_of( AI::suggest( array( 'title' => 'طبخة ملوخية rate' ) ) ), 'ai_rate_limited' );
 $log();
 
 // K8: refusals and cut-off answers.
