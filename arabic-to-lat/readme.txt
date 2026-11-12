@@ -164,7 +164,7 @@ No. It runs in short batches with a progress bar until everything is done, and y
 
 They suggest an English slug that says what the page is about, instead of a letter-by-letter transliteration. For طبخة ملوخية the normal slug is *tbkha-mlukhiya*; the AI suggests *molokhia-recipe* (style "Describe the post": the words people search for) or *molokhia-dish* (style "Translate the title"). Names of people, places and dishes keep their usual Latin spelling.
 
-To use it, go to Settings → Arabic to Latin → AI slug suggestions, switch it on and choose where the AI comes from. On WordPress 7.0 and later, the **WordPress AI connector** uses the AI service you already set up in Settings → Connectors (tested with the official providers for Anthropic Claude and Google Gemini), with no key to paste here. On any version you can instead choose Claude or ChatGPT and paste your own API key.
+To use it, go to Settings → Arabic to Latin → AI slug suggestions, switch it on and choose where the AI comes from. On WordPress 7.0 and later, the **WordPress AI connector** uses the AI service you already set up in Settings → Connectors (tested with the official providers for Anthropic Claude, OpenAI and Google Gemini), with no key to paste here. On any version you can instead choose Claude or ChatGPT and paste your own API key.
 
 In the block editor a panel "English slug (AI)" appears: click "Suggest", and the post title and the start of the post are sent to the provider. Nothing changes until you click "Use this slug", and you can still edit it. While the feature is switched off, nothing is sent anywhere.
 
