@@ -64,13 +64,31 @@ mkdir -p "$CACHE"
 
 wpq() { wp --path="$SITE" "$@" 2> >(grep -viE 'deprecat|^$' >&2); }
 
-# Plugins used by suites, downloaded once from wordpress.org.
+# Plugins used by suites, from wordpress.org. An unpinned plugin is re-downloaded when
+# wordpress.org has a newer version than the cached zip, so suites always test what users
+# install today (the 2026-11-10 check found WooCommerce and Polylang silently out of date).
+# Offline, the cached zip is used as is.
 fetch_plugin() {
 	local slug="$1" version="${2:-}"
 	local zip="$CACHE/$slug${version:+.$version}.zip"
+	if [ -z "$version" ] && [ -s "$zip" ]; then
+		local current cached
+		current="$(curl -fsS --max-time 10 "https://api.wordpress.org/plugins/info/1.0/$slug.json" 2>/dev/null | python3 -c 'import sys,json; print(json.load(sys.stdin).get("version",""))' 2>/dev/null)"
+		cached="$(cat "$zip.version" 2>/dev/null)"
+		if [ -n "$current" ] && [ "$current" != "$cached" ]; then
+			echo "  updating $slug ${cached:-(unknown)} → $current"
+			mv "$zip" "$zip.prev"
+		fi
+	fi
 	if [ ! -s "$zip" ]; then
 		echo "  downloading $slug${version:+ $version}"
-		curl -fsSL -o "$zip" "https://downloads.wordpress.org/plugin/$slug${version:+.$version}.zip" || { rm -f "$zip"; return 1; }
+		if ! curl -fsSL -o "$zip" "https://downloads.wordpress.org/plugin/$slug${version:+.$version}.zip"; then
+			rm -f "$zip"
+			[ -s "$zip.prev" ] && mv "$zip.prev" "$zip" && echo "  (download failed; using the cached $slug)" || return 1
+		else
+			rm -f "$zip.prev"
+			[ -z "$version" ] && curl -fsS --max-time 10 "https://api.wordpress.org/plugins/info/1.0/$slug.json" 2>/dev/null | python3 -c 'import sys,json; print(json.load(sys.stdin).get("version",""))' > "$zip.version" 2>/dev/null
+		fi
 	fi
 	unzip -qo "$zip" -d "$SITE/wp-content/plugins/"
 }

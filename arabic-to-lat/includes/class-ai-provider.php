@@ -70,7 +70,9 @@ final class AI_Provider {
 
 		$code = (int) wp_remote_retrieve_response_code( $response );
 		if ( 200 !== $code ) {
-			return self::http_error( $code );
+			// OpenAI reports "no credit left" as HTTP 429 insufficient_quota; waiting does not help, so it is a billing error.
+			$no_credit = 429 === $code && false !== strpos( (string) wp_remote_retrieve_body( $response ), 'insufficient_quota' );
+			return self::http_error( $no_credit ? 402 : $code );
 		}
 
 		$data = json_decode( (string) wp_remote_retrieve_body( $response ), true );
@@ -126,6 +128,10 @@ final class AI_Provider {
 		$bad_key = 400 === $status && ( false !== stripos( $text->get_error_message(), 'API_KEY_INVALID' ) || false !== stripos( $text->get_error_message(), 'API key not valid' ) );
 		if ( 401 === $status || 403 === $status || $bad_key ) {
 			return new \WP_Error( 'ai_key_rejected', __( 'The AI provider rejected the API key. Check it in Settings → Connectors.', 'arabic-to-lat' ), array( 'status' => 502 ) );
+		}
+		// Same no-credit case through the connector (the text is only inspected, never shown).
+		if ( 429 === $status && ( false !== stripos( $text->get_error_message(), 'insufficient_quota' ) || false !== stripos( $text->get_error_message(), 'exceeded your current quota' ) ) ) {
+			return self::http_error( 402 );
 		}
 		if ( $status >= 400 ) {
 			return self::http_error( $status );
