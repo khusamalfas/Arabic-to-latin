@@ -4,7 +4,7 @@ Tags: arabic, slug, permalink, transliteration, persian
 Requires at least: 6.4
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 1.2.1
+Stable tag: 1.2.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -211,6 +211,16 @@ What is sent, and when: the post title and the first 300 words of the post text,
 
 == Changelog ==
 
+= 1.2.2 =
+* New: choose the AI model with its cost in view. Each Claude and ChatGPT model in Settings → Arabic to Latin shows what one suggestion costs (for example Claude Haiku 5.5: under 0.05 cent; GPT-6 Astra: 1.5 to 4.3 cents), with the date of the prices and links to both pricing pages. Under the daily limit, an estimate of what today's requests cost at most.
+* New: with the WordPress AI connector (7.0+), pick one of the models it offers, or let WordPress choose as before. If that model is no longer available, WordPress uses another one instead of failing.
+* New: an advanced field for the ID of a model released after this version. Only lowercase letters, digits, dots and hyphens are accepted.
+* New: AI slug suggestions in the classic editor, as an "English slug (AI)" box in the sidebar that works like the block editor panel.
+* New: an **Urdu spelling style** (issue #2). Urdu writes no short vowels, so letters alone gave *ardu* for اردو and *krachi* for کراچی. The style knows common words and place names (اردو → *urdu*, لاہور → *lahore*, اسلام آباد → *islamabad*) and writes a final ہ after a consonant as *a* (زندہ → *zinda*). Opt-in; the Standard style and every other style give exactly the slugs they gave before.
+* OpenAI accounts with no credit left now get the billing message instead of "wait a minute and try again".
+* Hardening: settings written from code (WP-CLI, imports, other plugins) are checked like the settings form; uninstalling on a multisite network removes the settings and stored API keys of every site, not only the main one; without the PHP intl extension, the Persian and Urdu letter shapes copied from PDFs (پ چ ژ ک گ ی) are converted too.
+* The FAQ gives real prices per suggestion for each model and explains what a suggestion is. Tested with the official WordPress AI providers for Anthropic, OpenAI and Google Gemini.
+
 = 1.2.1 =
 * Security: uploaded file names are cleaned again with WordPress's own rules after transliteration. Before, a user allowed to upload files (author and above) could craft a name that placed the file outside the uploads folder, or kept an executable inner extension such as .php. that WordPress normally neutralises. Update recommended.
 * Security: each non-administrator now has a daily cap for paid AI suggestions (default 25, filter `arabic_to_lat_ai_user_daily_limit`), so one account cannot use up the site's AI budget.
@@ -264,6 +274,9 @@ What is sent, and when: the post title and the first 300 words of the post text,
 * Initial release.
 
 == Upgrade Notice ==
+
+= 1.2.2 =
+Choose the AI model with its cost per suggestion shown, AI suggestions in the classic editor, a new Urdu spelling style, and small hardening fixes. Existing slugs do not change.
 
 = 1.2.1 =
 Security fix for uploaded file names (users with upload rights). Update recommended.
