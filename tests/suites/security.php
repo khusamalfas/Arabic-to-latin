@@ -98,3 +98,48 @@ foreach ( array( '／‥／‥／ﻻx.jpg', '‥／‥／‥／ﻻ．jpg．jpg',
 	t_true( 'E14', "Upload '$name' refused or kept in the uploads folder", isset( $r['error'] ) || ( '' !== $file && dirname( $file ) === $uploads['path'] && false === strpos( $file, '..' ) ), $file ? $file : wp_json_encode( $r ) );
 	t_true( 'E14', "sanitize_file_name('$name') has no path characters", ! preg_match( '#[/\\\\]|\.\.#', sanitize_file_name( $name ) ), sanitize_file_name( $name ) );
 }
+
+// E15 (S5): settings stored from code (WP-CLI, an import, another plugin) are checked like the settings form.
+require_once WP_PLUGIN_DIR . '/arabic-to-lat/includes/class-admin.php';
+require_once WP_PLUGIN_DIR . '/arabic-to-lat/includes/class-ai-admin.php';
+$settings_admin = new ArabicToLat\Admin();
+t_check(
+	'E15',
+	'Stored transliteration settings: bad pairs dropped, values cleaned, unknown style reset',
+	$settings_admin->sanitize_settings( array( 'files' => true, 'preset' => 'nope', 'custom' => array( 'ع' => '3<script>', 'abc' => 'x', 'محمد' => array( 'nested' ), '<b>م</b>' => 'm', 'ح' => 'H"' ) ) ),
+	array( 'files' => true, 'preset' => 'standard', 'custom' => array( 'ع' => '3script', 'ح' => 'h' ) )
+);
+t_check( 'E15', 'A clean stored table passes unchanged', $settings_admin->sanitize_settings( array( 'files' => false, 'preset' => 'egyptian', 'custom' => array( 'محمد' => 'mohammed', 'ع' => '3' ) ) ), array( 'files' => false, 'preset' => 'egyptian', 'custom' => array( 'محمد' => 'mohammed', 'ع' => '3' ) ) );
+
+$ai_admin = new ArabicToLat\AI_Admin();
+$got      = $ai_admin->sanitize(
+	array(
+		'enabled'         => '1',
+		'provider'        => 'evil',
+		'model_anthropic' => '../../v1/files',
+		'model_openai'    => 'gpt-6.1-sol',
+		'model_wordpress' => 'x|<script>',
+		'key_anthropic'   => 'sk-ant-raw-key-in-clear',
+		'key_openai'      => '<img src=x onerror=alert(1)>',
+		'style'           => 'translate',
+		'daily_limit'     => 999999,
+		'extra'           => 'dropped',
+	)
+);
+ksort( $got );
+$want = array(
+	'daily_limit'  => 10000,
+	'enabled'      => true,
+	'model_openai' => 'gpt-6.1-sol',
+	'provider'     => function_exists( 'wp_ai_client_prompt' ) ? 'wordpress' : 'anthropic',
+	'style'        => 'translate',
+);
+t_check( 'E15', 'Stored AI settings: unknown keys, bad models, raw keys and markup dropped; limit capped', $got, $want );
+$encrypted = ArabicToLat\AI::encrypt( 'sk-ant-test-key-000000000000' );
+$kept      = $ai_admin->sanitize( array( 'key_anthropic' => $encrypted, 'model_anthropic' => 'claude-opus-5-6', 'model_wordpress' => 'anthropic|claude-haiku-5-5' ) );
+t_check( 'E15', 'Encrypted key, typed model ID and connector model are kept', $kept, array( 'model_wordpress' => 'anthropic|claude-haiku-5-5', 'model_anthropic' => 'claude-opus-5-6', 'key_anthropic' => $encrypted ) );
+
+// E16 (N15): mixed Arabic/Latin examples keep their own direction on a right-to-left admin page.
+$page = t_http( 'wp-admin/options-general.php?page=arabic-to-lat', array( 'cookies' => $admin ) );
+t_true( 'E16', 'File-name example isolated left-to-right', false !== strpos( $page['body'], '<bdi dir="ltr"><bdi>صورة</bdi>.jpg → sura.jpg</bdi>' ) );
+t_true( 'E16', 'Custom-replacement examples isolated left-to-right', false !== strpos( $page['body'], '<bdi dir="ltr"><code><bdi>ع</bdi> = 3</code></bdi>' ) && false !== strpos( $page['body'], '<bdi dir="ltr"><code><bdi>محمد</bdi> = mohammed</code></bdi>' ) );

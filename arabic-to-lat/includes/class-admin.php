@@ -83,12 +83,20 @@ final class Admin {
 		$input  = is_array( $input ) ? $input : array();
 		$preset = isset( $input['preset'] ) && isset( Transliterator::presets()[ $input['preset'] ] ) ? (string) $input['preset'] : 'standard';
 
-		// Already sanitized (update_option() called directly with the stored shape).
+		// The stored shape (update_option() from code, WP-CLI, an import): every pair is checked
+		// again, the same way as a line typed in the settings form.
 		if ( isset( $input['custom'] ) && is_array( $input['custom'] ) && ! isset( $input['custom_raw'] ) ) {
+			$custom = array();
+			foreach ( $input['custom'] as $from => $to ) {
+				$pair = is_scalar( $to ) ? self::clean_pair( (string) $from, (string) $to ) : null;
+				if ( null !== $pair ) {
+					$custom[ $pair[0] ] = $pair[1];
+				}
+			}
 			return array(
 				'files'  => ! empty( $input['files'] ),
 				'preset' => $preset,
-				'custom' => $input['custom'],
+				'custom' => $custom,
 			);
 		}
 
@@ -113,15 +121,29 @@ final class Admin {
 			if ( count( $parts ) !== 2 ) {
 				continue;
 			}
-			$from = trim( $parts[0] );
-			$to   = strtolower( preg_replace( '/[^A-Za-z0-9\- ]/', '', trim( $parts[1] ) ) );
-			$only_arabic_and_spaces = preg_match( '/^[\s\x{0600}-\x{06FF}\x{0750}-\x{077F}\x{08A0}-\x{08FF}\x{FB50}-\x{FDFF}\x{FE70}-\x{FEFF}]+$/u', $from );
-			if ( '' === $from || ! $only_arabic_and_spaces ) {
-				continue;
+			$pair = self::clean_pair( $parts[0], $parts[1] );
+			if ( null !== $pair ) {
+				$table[ $pair[0] ] = $pair[1];
 			}
-			$table[ $from ] = $to;
 		}
 		return $table;
+	}
+
+	/**
+	 * One replacement: Arabic script (spaces allowed) → what can live in a URL.
+	 *
+	 * @param string $from Arabic letter, word or phrase.
+	 * @param string $to   Latin replacement.
+	 * @return array{0: string, 1: string}|null Null when the Arabic side is not Arabic script.
+	 */
+	private static function clean_pair( $from, $to ) {
+		$from = trim( $from );
+		$to   = strtolower( (string) preg_replace( '/[^A-Za-z0-9\- ]/', '', trim( $to ) ) );
+		$only_arabic_and_spaces = preg_match( '/^[\s\x{0600}-\x{06FF}\x{0750}-\x{077F}\x{08A0}-\x{08FF}\x{FB50}-\x{FDFF}\x{FE70}-\x{FEFF}]+$/u', $from );
+		if ( '' === $from || ! $only_arabic_and_spaces ) {
+			return null;
+		}
+		return array( $from, $to );
 	}
 
 	public function activation_notice() {

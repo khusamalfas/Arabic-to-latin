@@ -238,6 +238,22 @@ final class Transliterator {
 			}
 		}
 
+		// Persian and Urdu letters (U+FB56–U+FBFF): isolated, final, initial, medial.
+		foreach ( array(
+			0xFB56 => 'پ',
+			0xFB7A => 'چ',
+			0xFB8A => 'ژ',
+			0xFB8E => 'ک',
+			0xFB92 => 'گ',
+			0xFBFC => 'ی',
+		) as $first => $letter ) {
+			$count = 0xFB8A === $first ? 2 : 4;
+			for ( $i = 0; $i < $count; $i++ ) {
+				$code = $first + $i;
+				$map[ chr( 0xE0 | ( $code >> 12 ) ) . chr( 0x80 | ( ( $code >> 6 ) & 0x3F ) ) . chr( 0x80 | ( $code & 0x3F ) ) ] = $letter;
+			}
+		}
+
 		// Lam-alef ligatures (isolated and final), and common word ligatures.
 		$map += array(
 			"\u{FEF5}" => 'لآ',
