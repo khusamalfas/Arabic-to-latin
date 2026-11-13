@@ -90,23 +90,29 @@ final class AI_Provider {
 
 	/**
 	 * WordPress AI Client: the connector set up in Settings → Connectors picks
-	 * the provider and model. Same prompt, schema and validation as the direct
-	 * path. Core's error messages include the provider's text, so only the
-	 * error code and HTTP status are used.
+	 * the provider and model, preferring the one chosen in this plugin's
+	 * settings when that connector still offers it. Same prompt, schema and
+	 * validation as the direct path. Core's error messages include the
+	 * provider's text, so only the error code and HTTP status are used.
 	 *
-	 * @param string $system Instructions.
-	 * @param string $user   Delimited title and text.
+	 * @param string $system     Instructions.
+	 * @param string $user       Delimited title and text.
+	 * @param string $preference "provider|model", or '' to let WordPress choose.
 	 * @return string|\WP_Error JSON text from the model.
 	 */
-	public static function wordpress_request( $system, $user ) {
+	public static function wordpress_request( $system, $user, $preference = '' ) {
 		if ( ! function_exists( 'wp_ai_client_prompt' ) ) {
 			return new \WP_Error( 'ai_no_wordpress_client', __( 'This WordPress version has no AI connectors. Choose Claude or ChatGPT with your own key in Settings → Arabic to Latin.', 'arabic-to-lat' ), array( 'status' => 400 ) );
 		}
-		$text = wp_ai_client_prompt( $user )
+		$prompt = wp_ai_client_prompt( $user )
 			->using_system_instruction( $system )
 			->using_max_tokens( self::MAX_TOKENS )
-			->as_json_response( self::schema() )
-			->generate_text();
+			->as_json_response( self::schema() );
+		if ( '' !== $preference && preg_match( AI::CONNECTOR_MODEL_PATTERN, $preference ) ) {
+			list( $provider_id, $model_id ) = explode( '|', $preference, 2 );
+			$prompt                         = $prompt->using_model_preference( array( $provider_id, $model_id ) );
+		}
+		$text = $prompt->generate_text();
 
 		if ( ! is_wp_error( $text ) ) {
 			return is_string( $text ) && '' !== $text ? $text : self::invalid();

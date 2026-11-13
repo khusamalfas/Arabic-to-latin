@@ -175,9 +175,11 @@ You pay your AI provider per request; the plugin itself is free. One suggestion 
 * Claude Haiku 5.5 or GPT-6 Luna: less than 0.05 cent
 * Claude Sonnet 5.5 or GPT-6.1 Sol: 0.3 to 0.9 cent
 * Claude Opus 5.5 (the default for Claude): 0.6 to 1.7 cents
-* GPT-6 Astra (the default for ChatGPT): 1.6 to 4.3 cents
+* GPT-6 Astra (the default for ChatGPT): 1.5 to 4.3 cents
 
 Prices change: check [Anthropic's pricing](https://platform.claude.com/docs/en/about-claude/pricing) and [OpenAI's pricing](https://developers.openai.com/api/docs/pricing). With the WordPress AI connector, the cost depends on the service and model set up there.
+
+The settings page shows this cost beside each model, so you can choose with the price in view. You can also type the ID of a model released after this version of the plugin, and with the WordPress AI connector pick one of the models it offers or let WordPress choose.
 
 To keep the bill predictable, asking again for the same title and text is answered from a cache for free, a daily limit (100 requests by default, changeable in the settings) stops requests until the next day, and each user who is not an administrator can make at most 25 paid requests a day. At the default limit, even the most expensive model stays under about $5 a day.
 

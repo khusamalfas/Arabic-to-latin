@@ -22,6 +22,11 @@ final class AI {
 	const CACHE  = 'arabic_to_lat_ai_';
 
 	/**
+	 * Transient with the models the WordPress AI connectors offer.
+	 */
+	const CONNECTOR_MODELS = 'arabic_to_lat_ai_connector_models';
+
+	/**
 	 * Provider value for "use the WordPress AI Client".
 	 */
 	const WORDPRESS = 'wordpress';
@@ -33,6 +38,28 @@ final class AI {
 		'anthropic' => 'ARABIC_TO_LAT_ANTHROPIC_KEY',
 		'openai'    => 'ARABIC_TO_LAT_OPENAI_KEY',
 	);
+
+	/**
+	 * Date of the list prices in prices() (Y-m-d). Re-check at every release.
+	 */
+	const PRICES_DATE = '2026-11-12';
+
+	/**
+	 * A model ID typed by the site owner: lowercase letters, digits, dots and hyphens.
+	 */
+	const MODEL_ID_PATTERN = '/^[a-z0-9][a-z0-9.\-]{1,62}$/';
+
+	/**
+	 * A connector model choice: "provider|model", as stored for the WordPress AI connector.
+	 */
+	const CONNECTOR_MODEL_PATTERN = '/^[a-z0-9_\-]{1,40}\|[A-Za-z0-9][A-Za-z0-9._:\/\-]{0,127}$/';
+
+	/**
+	 * Tokens in one suggestion, for the cost estimate: [input, output] for a
+	 * short post and for a title with 300 words of Arabic text.
+	 */
+	const TOKENS_LOW  = array( 500, 200 );
+	const TOKENS_HIGH = array( 1800, 500 );
 
 	/**
 	 * Models offered per provider; the first one is the default.
@@ -62,7 +89,123 @@ final class AI {
 	}
 
 	/**
-	 * @return array{enabled: bool, provider: string, model_anthropic: string, model_openai: string, key_anthropic: string, key_openai: string, style: string, daily_limit: int}
+	 * List prices in US dollars per million tokens, as of PRICES_DATE. Also used
+	 * for models chosen through the WordPress AI connector when the ID matches.
+	 *
+	 * @return array<string, array{0: float, 1: float}> model id => [ input, output ]
+	 */
+	public static function prices() {
+		$prices = array(
+			'claude-opus-5-5'   => array( 4.0, 20.0 ),
+			'claude-sonnet-5-5' => array( 2.0, 10.0 ),
+			'claude-haiku-5-5'  => array( 0.1, 0.5 ),
+			'gpt-6-astra'       => array( 10.0, 50.0 ),
+			'gpt-6.1-sol'       => array( 2.0, 10.0 ),
+			'gpt-6-luna'        => array( 0.1, 0.5 ),
+		);
+
+		/**
+		 * Filters the list prices used for the cost shown beside each model.
+		 *
+		 * @param array $prices model id => [ input, output ] in US dollars per million tokens.
+		 */
+		return (array) apply_filters( 'arabic_to_lat_ai_prices', $prices );
+	}
+
+	/**
+	 * Estimated cost of one suggestion with a model, in US cents.
+	 *
+	 * @param string $model Model ID.
+	 * @return array{0: float, 1: float}|null [ low, high ], or null when the price is not known.
+	 */
+	public static function cost_per_suggestion( $model ) {
+		$prices = self::prices();
+		if ( ! isset( $prices[ $model ] ) || ! is_array( $prices[ $model ] ) || ! isset( $prices[ $model ][0], $prices[ $model ][1] ) ) {
+			return null;
+		}
+		$in  = (float) $prices[ $model ][0];
+		$out = (float) $prices[ $model ][1];
+		return array(
+			( self::TOKENS_LOW[0] * $in + self::TOKENS_LOW[1] * $out ) / 10000,
+			( self::TOKENS_HIGH[0] * $in + self::TOKENS_HIGH[1] * $out ) / 10000,
+		);
+	}
+
+	/**
+	 * "0.6–1.7¢ per suggestion", "under 0.05¢ per suggestion", or "price: see your provider".
+	 *
+	 * @param string $model Model ID.
+	 */
+	public static function price_label( $model ) {
+		$cost = self::cost_per_suggestion( $model );
+		if ( null === $cost ) {
+			return __( 'price: see your provider', 'arabic-to-lat' );
+		}
+		if ( $cost[1] < 0.05 ) {
+			return __( 'under 0.05¢ per suggestion', 'arabic-to-lat' );
+		}
+		return sprintf(
+			/* translators: 1: lowest cost in US cents, 2: highest cost in US cents */
+			__( '%1$s–%2$s¢ per suggestion', 'arabic-to-lat' ),
+			number_format_i18n( $cost[0], 1 ),
+			number_format_i18n( $cost[1], 1 )
+		);
+	}
+
+	/**
+	 * The model ID behind a stored model choice ("provider|model" for the connector).
+	 *
+	 * @param string $choice Stored value.
+	 */
+	public static function model_id( $choice ) {
+		$pos = strpos( (string) $choice, '|' );
+		return false === $pos ? (string) $choice : substr( (string) $choice, $pos + 1 );
+	}
+
+	/**
+	 * Models the WordPress AI connectors offer for text. Settings page only:
+	 * the list can cost one request per configured provider, so it is kept for
+	 * an hour and dropped when the AI settings are saved.
+	 *
+	 * @return array<int, array{provider: string, provider_name: string, id: string, name: string}>
+	 */
+	public static function connector_models() {
+		if ( ! self::wordpress_client_available() ) {
+			return array();
+		}
+		$cached = get_transient( self::CONNECTOR_MODELS );
+		if ( is_array( $cached ) ) {
+			return $cached;
+		}
+		$found = array();
+		if ( class_exists( '\WordPress\AiClient\AiClient' ) && class_exists( '\WordPress\AiClient\Providers\Models\DTO\ModelRequirements' ) && class_exists( '\WordPress\AiClient\Providers\Models\Enums\CapabilityEnum' ) ) {
+			try {
+				$requirements = new \WordPress\AiClient\Providers\Models\DTO\ModelRequirements( array( \WordPress\AiClient\Providers\Models\Enums\CapabilityEnum::textGeneration() ), array() );
+				foreach ( \WordPress\AiClient\AiClient::defaultRegistry()->findModelsMetadataForSupport( $requirements ) as $provider_models ) {
+					$provider = $provider_models->getProvider();
+					foreach ( $provider_models->getModels() as $model ) {
+						$choice = $provider->getId() . '|' . $model->getId();
+						if ( preg_match( self::CONNECTOR_MODEL_PATTERN, $choice ) ) {
+							$found[] = array(
+								'provider'      => $provider->getId(),
+								'provider_name' => $provider->getName(),
+								'id'            => $model->getId(),
+								'name'          => $model->getName(),
+							);
+						}
+					}
+				}
+			} catch ( \Throwable $e ) {
+				// A provider could not list its models (network, key). Show what was found, retry next time.
+				return $found;
+			}
+		}
+		set_transient( self::CONNECTOR_MODELS, $found, HOUR_IN_SECONDS );
+		return $found;
+	}
+
+	/**
+	 * @return array{enabled: bool, provider: string, model_anthropic: string, model_openai: string, model_wordpress: string, key_anthropic: string, key_openai: string, style: string, daily_limit: int}
 	 */
 	public static function settings() {
 		$saved  = get_option( self::OPTION, array() );
@@ -80,6 +223,7 @@ final class AI {
 			'provider'        => $provider,
 			'model_anthropic' => isset( $saved['model_anthropic'] ) ? (string) $saved['model_anthropic'] : '',
 			'model_openai'    => isset( $saved['model_openai'] ) ? (string) $saved['model_openai'] : '',
+			'model_wordpress' => isset( $saved['model_wordpress'] ) && is_string( $saved['model_wordpress'] ) && preg_match( self::CONNECTOR_MODEL_PATTERN, $saved['model_wordpress'] ) ? $saved['model_wordpress'] : '',
 			'key_anthropic'   => isset( $saved['key_anthropic'] ) ? (string) $saved['key_anthropic'] : '',
 			'key_openai'      => isset( $saved['key_openai'] ) ? (string) $saved['key_openai'] : '',
 			'style'           => isset( $saved['style'] ) && 'translate' === $saved['style'] ? 'translate' : 'describe',
@@ -87,7 +231,8 @@ final class AI {
 		);
 		foreach ( array( 'anthropic', 'openai' ) as $provider ) {
 			$field = 'model_' . $provider;
-			if ( ! isset( $models[ $provider ][ $settings[ $field ] ] ) ) {
+			// A listed model, or a model ID the owner typed (checked by "Test connection").
+			if ( ! isset( $models[ $provider ][ $settings[ $field ] ] ) && ! preg_match( self::MODEL_ID_PATTERN, $settings[ $field ] ) ) {
 				$settings[ $field ] = (string) key( $models[ $provider ] );
 			}
 		}
@@ -254,8 +399,8 @@ final class AI {
 		}
 		$text  = self::clean_text( isset( $input['content'] ) ? (string) $input['content'] : '', 300 );
 		$style = isset( $input['style'] ) && in_array( $input['style'], array( 'describe', 'translate' ), true ) ? $input['style'] : $settings['style'];
-		// With the WordPress AI Client, the connector picks the model.
-		$model = self::WORDPRESS === $provider ? '' : $settings[ 'model_' . $provider ];
+		// With the WordPress AI Client: the model the owner prefers ("provider|model"), or '' to let WordPress choose.
+		$model = $settings[ 'model_' . $provider ];
 
 		$cache_key = self::CACHE . md5( wp_json_encode( array( $provider, $model, $style, $title, $text ) ) );
 		if ( empty( $input['no_cache'] ) ) {
@@ -265,7 +410,7 @@ final class AI {
 					'slug'     => $cached,
 					'cached'   => true,
 					'provider' => $provider,
-					'model'    => $model,
+					'model'    => self::model_id( $model ),
 				);
 			}
 		}
@@ -279,7 +424,7 @@ final class AI {
 		}
 
 		$raw = self::WORDPRESS === $provider
-			? AI_Provider::wordpress_request( self::system_prompt( $style ), self::user_message( $title, $text ) )
+			? AI_Provider::wordpress_request( self::system_prompt( $style ), self::user_message( $title, $text ), $model )
 			: AI_Provider::request( $provider, $key, $model, self::system_prompt( $style ), self::user_message( $title, $text ) );
 		if ( is_wp_error( $raw ) ) {
 			return $raw;
@@ -295,7 +440,7 @@ final class AI {
 			'slug'     => $slug,
 			'cached'   => false,
 			'provider' => $provider,
-			'model'    => $model,
+			'model'    => self::model_id( $model ),
 		);
 	}
 
