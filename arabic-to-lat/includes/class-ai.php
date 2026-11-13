@@ -560,6 +560,7 @@ final class AI {
 	public function init() {
 		add_action( 'rest_api_init', array( $this, 'register_rest_route' ) );
 		add_action( 'enqueue_block_editor_assets', array( $this, 'enqueue_editor_script' ) );
+		add_action( 'add_meta_boxes', array( $this, 'add_classic_box' ), 10, 2 );
 		add_action( 'admin_init', array( $this, 'privacy_policy_content' ) );
 	}
 
@@ -638,6 +639,83 @@ final class AI {
 				'provider' => self::provider_label( $settings['provider'] ),
 			)
 		);
+	}
+
+	/**
+	 * Classic editor: the same "English slug (AI)" panel as a sidebar box. Only
+	 * for posts edited without the block editor, on post types with public URLs.
+	 *
+	 * @param string   $post_type Post type of the screen.
+	 * @param \WP_Post $post      Post being edited.
+	 */
+	public function add_classic_box( $post_type, $post = null ) {
+		if ( ! $post instanceof \WP_Post || ! self::is_ready() || ! is_post_type_viewable( $post_type ) ) {
+			return;
+		}
+		if ( function_exists( 'use_block_editor_for_post' ) && use_block_editor_for_post( $post ) ) {
+			return;
+		}
+		if ( ! current_user_can( 'edit_post', $post->ID ) ) {
+			return;
+		}
+		// Where WordPress offers no slug field (a contributor's pending post), a suggestion could not be saved.
+		$type = get_post_type_object( $post_type );
+		if ( 'pending' === get_post_status( $post ) && ( ! $type || ! current_user_can( $type->cap->publish_posts ) ) ) {
+			return;
+		}
+		add_meta_box( 'arabic-to-lat-ai-slug', __( 'English slug (AI)', 'arabic-to-lat' ), array( $this, 'render_classic_box' ), $post_type, 'side', 'default' );
+		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_classic_script' ) );
+	}
+
+	public function enqueue_classic_script() {
+		wp_enqueue_script(
+			'arabic-to-lat-ai-slug-classic',
+			plugins_url( 'assets/js/ai-slug-classic.js', ARABIC_TO_LAT_FILE ),
+			array( 'jquery', 'wp-api-fetch', 'wp-a11y' ),
+			ARABIC_TO_LAT_VERSION,
+			true
+		);
+		// Strings come from PHP, so the box is translated the same way as the rest of the settings.
+		wp_localize_script(
+			'arabic-to-lat-ai-slug-classic',
+			'arabicToLatAIClassic',
+			array(
+				'noTitle' => __( 'Write a title first, then ask for a slug.', 'arabic-to-lat' ),
+				'failed'  => __( 'The suggestion failed. Try again.', 'arabic-to-lat' ),
+				'useThis' => __( 'Use this slug', 'arabic-to-lat' ),
+				'inUse'   => __( 'In use', 'arabic-to-lat' ),
+			)
+		);
+	}
+
+	public function render_classic_box() {
+		$settings = self::settings();
+		?>
+		<div id="arabic-to-lat-ai-slug-box">
+			<p>
+				<label for="atl-ai-style"><?php esc_html_e( 'Style', 'arabic-to-lat' ); ?></label><br>
+				<select id="atl-ai-style" class="atl-ai-style widefat">
+					<option value="describe" <?php selected( $settings['style'], 'describe' ); ?>><?php esc_html_e( 'Describe the post', 'arabic-to-lat' ); ?></option>
+					<option value="translate" <?php selected( $settings['style'], 'translate' ); ?>><?php esc_html_e( 'Translate the title', 'arabic-to-lat' ); ?></option>
+				</select>
+			</p>
+			<p>
+				<button type="button" class="button atl-ai-suggest">
+					<?php
+					/* translators: %s: Claude or ChatGPT */
+					echo esc_html( sprintf( __( 'Suggest with %s', 'arabic-to-lat' ), self::provider_label( $settings['provider'] ) ) );
+					?>
+				</button>
+				<span class="spinner" style="float:none;margin-top:4px"></span>
+			</p>
+			<div class="notice notice-warning inline atl-ai-message" role="alert" hidden style="margin:0 0 8px;padding:6px 10px"></div>
+			<div class="atl-ai-result" hidden>
+				<p><code class="atl-ai-slug" dir="ltr"></code></p>
+				<p><button type="button" class="button button-primary atl-ai-use"><?php esc_html_e( 'Use this slug', 'arabic-to-lat' ); ?></button></p>
+			</div>
+			<p class="description"><?php esc_html_e( 'Sends the title and the start of the post to the AI provider. Nothing changes until you click "Use this slug".', 'arabic-to-lat' ); ?></p>
+		</div>
+		<?php
 	}
 
 	/**

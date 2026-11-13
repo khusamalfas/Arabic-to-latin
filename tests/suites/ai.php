@@ -371,6 +371,31 @@ $page = t_http( 'wp-admin/options-general.php?page=arabic-to-lat', array( 'cooki
 t_true( 'K32', 'Settings page shows the typed model, open, with no invented price', false !== strpos( $page['body'], 'value="claude-opus-5-6"' ) && false !== strpos( $page['body'], 'In use: claude-opus-5-6 (price: see your provider).' ) && 1 === preg_match( '/<details[^>]*open>/', $page['body'] ) );
 $log();
 
+// K35 (N9): classic editor: the same panel as a sidebar box, loaded without asking the provider anything.
+$configure();
+$log();
+update_option( 'arabic_to_lat_test_classic', 1, false );
+$classic = t_http( 'wp-admin/post-new.php', array( 'cookies' => t_login( 1 ) ) );
+t_true( 'K35', 'Classic editor shows the "English slug (AI)" box', 200 === $classic['code'] && false !== strpos( $classic['body'], 'id="arabic-to-lat-ai-slug-box"' ) && false !== strpos( $classic['body'], 'Suggest with Claude' ) );
+t_true( 'K35', 'Classic box script and its strings are loaded', false !== strpos( $classic['body'], 'assets/js/ai-slug-classic.js' ) && false !== strpos( $classic['body'], 'arabicToLatAIClassic' ) );
+t_true( 'K35', 'Block editor panel script not loaded in the classic editor', false === strpos( $classic['body'], 'assets/js/ai-slug.js' ) );
+t_true( 'K35', 'The box has what the script needs: post ID, permalink nonce, slug field', 1 === preg_match( '/id=["\']post_ID["\']/', $classic['body'] ) && false !== strpos( $classic['body'], 'id="samplepermalinknonce"' ) && false !== strpos( $classic['body'], 'id="post_name"' ) );
+t_check( 'K35', 'Opening the classic editor sends no request to the provider', count( $log() ), 0 );
+$contributor_id = t_user( 'contributor' );
+$pending        = wp_insert_post( array( 'post_title' => 'مقالة معلقة', 'post_status' => 'pending', 'post_author' => $contributor_id ) );
+$as_contributor = t_http( 'wp-admin/post.php?post=' . $pending . '&action=edit', array( 'cookies' => t_login( $contributor_id ) ) );
+t_true( 'K35', "No box on a contributor's pending post (WordPress offers no slug field there)", 200 === $as_contributor['code'] && false === strpos( $as_contributor['body'], 'arabic-to-lat-ai-slug-box' ), (string) $as_contributor['code'] );
+$page_edit = t_http( 'wp-admin/post-new.php?post_type=page', array( 'cookies' => t_login( 1 ) ) );
+t_true( 'K35', 'Pages get the box too', false !== strpos( $page_edit['body'], 'id="arabic-to-lat-ai-slug-box"' ) );
+$configure( array( 'enabled' => false ) );
+$classic = t_http( 'wp-admin/post-new.php', array( 'cookies' => t_login( 1 ) ) );
+t_true( 'K35', 'No box while AI suggestions are off', 200 === $classic['code'] && false === strpos( $classic['body'], 'arabic-to-lat-ai-slug-box' ) && false === strpos( $classic['body'], 'ai-slug-classic.js' ) );
+$configure();
+delete_option( 'arabic_to_lat_test_classic' );
+$block = t_http( 'wp-admin/post-new.php', array( 'cookies' => t_login( 1 ) ) );
+t_true( 'K35', 'Block editor: panel script, no classic box', false !== strpos( $block['body'], 'assets/js/ai-slug.js' ) && false === strpos( $block['body'], 'arabic-to-lat-ai-slug-box' ) );
+$log();
+
 // K16: uninstall removes AI settings, key, counter and cache (last: it uninstalls).
 $configure();
 $mock( 200, $claude_answer( '{"slug":"before-uninstall"}' ) );

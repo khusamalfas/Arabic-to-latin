@@ -85,6 +85,11 @@ add_filter(
 );
 
 // Suite ai-connectors.php: simulate a site where AI is switched off (WP_AI_SUPPORT / wp_supports_ai).
+// Classic editor for every post (what the Classic Editor plugin does).
+if ( get_option( 'arabic_to_lat_test_classic' ) ) {
+	add_filter( 'use_block_editor_for_post', '__return_false' );
+}
+
 if ( get_option( 'arabic_to_lat_test_no_ai' ) ) {
 	add_filter( 'wp_supports_ai', '__return_false' );
 }
