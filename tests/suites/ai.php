@@ -323,6 +323,54 @@ t_check( 'K27', 'Administrator not capped', $code_of( AI::suggest( array( 'title
 remove_all_filters( 'arabic_to_lat_ai_user_daily_limit' );
 $log();
 
+// K30: price beside each model (N13), from the list prices in AI::prices().
+t_check(
+	'K30',
+	'Cost per suggestion for each offered model',
+	array_map( array( AI::class, 'price_label' ), array( 'claude-opus-5-5', 'claude-sonnet-5-5', 'claude-haiku-5-5', 'gpt-6-astra', 'gpt-6.1-sol', 'gpt-6-luna' ) ),
+	array( '0.6–1.7¢ per suggestion', '0.3–0.9¢ per suggestion', 'under 0.05¢ per suggestion', '1.5–4.3¢ per suggestion', '0.3–0.9¢ per suggestion', 'under 0.05¢ per suggestion' )
+);
+t_check( 'K30', 'Unknown model: no invented price', AI::price_label( 'claude-opus-9-9' ), 'price: see your provider' );
+t_check( 'K30', 'Every offered model has a price', array_values( array_filter( array_merge( array_keys( AI::models()['anthropic'] ), array_keys( AI::models()['openai'] ) ), function ( $m ) { return null === AI::cost_per_suggestion( $m ); } ) ), array() );
+$configure();
+delete_option( AI::USAGE );
+$page = t_http( 'wp-admin/options-general.php?page=arabic-to-lat', array( 'cookies' => t_login( 1 ) ) );
+t_true( 'K30', 'Dropdown shows the price beside the model', false !== strpos( $page['body'], 'Claude Haiku 5.5 — under 0.05¢ per suggestion' ) && false !== strpos( $page['body'], 'GPT-6 Astra — 1.5–4.3¢ per suggestion' ) );
+t_true( 'K30', 'Date of the prices and both pricing pages shown', false !== strpos( $page['body'], date_i18n( get_option( 'date_format' ), strtotime( AI::PRICES_DATE . ' 12:00:00' ) ) ) && false !== strpos( $page['body'], 'platform.claude.com/docs/en/about-claude/pricing' ) && false !== strpos( $page['body'], 'developers.openai.com/api/docs/pricing' ) );
+t_true( 'K30', 'No cost line before anything is used', false === strpos( $page['body'], 'Estimated cost of today' ) );
+t_true( 'K30', 'Settings page: no PHP warnings', false === stripos( $page['body'], 'Warning:' ) && false === stripos( $page['body'], 'Fatal error' ) && false === stripos( $page['body'], 'Notice:' ) );
+
+// K31: cost line under the daily limit: worst case for today's requests at the chosen model's prices.
+update_option( AI::USAGE, array( 'day' => gmdate( 'Y-m-d' ), 'count' => 12, 'users' => array() ), false );
+$page = t_http( 'wp-admin/options-general.php?page=arabic-to-lat', array( 'cookies' => t_login( 1 ) ) );
+t_true( 'K31', '12 requests at Claude Opus 5.5: at most $0.21', false !== strpos( $page['body'], 'Estimated cost of today&#039;s requests: at most $0.21 at Claude Opus 5.5 prices.' ), 'cost line missing' );
+$configure( array( 'model_anthropic' => 'claude-haiku-5-5' ) );
+update_option( AI::USAGE, array( 'day' => gmdate( 'Y-m-d' ), 'count' => 3, 'users' => array() ), false );
+$page = t_http( 'wp-admin/options-general.php?page=arabic-to-lat', array( 'cookies' => t_login( 1 ) ) );
+t_true( 'K31', 'Tiny amounts shown as at most $0.01, never $0.00', false !== strpos( $page['body'], 'at most $0.01 at Claude Haiku 5.5 prices' ) );
+delete_option( AI::USAGE );
+
+// K32: custom model ID (advanced field) for a model released after this version.
+$admin = new ArabicToLat\AI_Admin();
+$form  = array( 'arabic_to_lat_ai_form' => '1', 'enabled' => '1', 'provider' => 'anthropic', 'model_anthropic' => 'claude-sonnet-5-5', 'model_openai' => 'gpt-6-luna', 'daily_limit' => '100' );
+t_check( 'K32', 'Typed model ID replaces the list choice', $admin->sanitize( array_merge( $form, array( 'custom_model_anthropic' => '  Claude-Opus-5-6 ' ) ) )['model_anthropic'], 'claude-opus-5-6' );
+t_check( 'K32', 'Empty field: the list choice is used', $admin->sanitize( array_merge( $form, array( 'custom_model_anthropic' => '' ) ) )['model_anthropic'], 'claude-sonnet-5-5' );
+foreach ( array( 'claude opus', '../../v1/files', 'claude-<b>', '-leading-dash', str_repeat( 'a', 70 ), 'ft:gpt-6:org' ) as $bad ) {
+	t_check( 'K32', 'Rejected model ID: ' . substr( $bad, 0, 20 ), $admin->sanitize( array_merge( $form, array( 'custom_model_openai' => $bad ) ) )['model_openai'], 'gpt-6-luna' );
+}
+$configure( array( 'model_anthropic' => 'claude-opus-5-6' ) );
+t_check( 'K32', 'Saved custom model is kept on read', AI::settings()['model_anthropic'], 'claude-opus-5-6' );
+$mock( 200, $claude_answer( '{"slug":"custom-model"}' ) );
+AI::suggest( array( 'title' => 'نموذج مخصص' ) );
+$req = $log();
+t_check( 'K32', 'Request uses the typed model', isset( $req[0]['body']['model'] ) ? $req[0]['body']['model'] : null, 'claude-opus-5-6' );
+$configure( array( 'model_anthropic' => 'Bad Model!' ) );
+t_check( 'K32', 'Invalid stored model falls back to the default', AI::settings()['model_anthropic'], 'claude-opus-5-5' );
+$configure( array( 'model_anthropic' => 'claude-opus-5-6' ) );
+$page = t_http( 'wp-admin/options-general.php?page=arabic-to-lat', array( 'cookies' => t_login( 1 ) ) );
+t_true( 'K32', 'Settings page shows the typed model, open, with no invented price', false !== strpos( $page['body'], 'value="claude-opus-5-6"' ) && false !== strpos( $page['body'], 'In use: claude-opus-5-6 (price: see your provider).' ) && 1 === preg_match( '/<details[^>]*open>/', $page['body'] ) );
+$log();
+
 // K16: uninstall removes AI settings, key, counter and cache (last: it uninstalls).
 $configure();
 $mock( 200, $claude_answer( '{"slug":"before-uninstall"}' ) );

@@ -58,9 +58,35 @@ final class AI_Admin {
 			'style'       => isset( $input['style'] ) && 'translate' === $input['style'] ? 'translate' : 'describe',
 			'daily_limit' => isset( $input['daily_limit'] ) ? min( 10000, max( 0, (int) $input['daily_limit'] ) ) : 100,
 		);
+		// WordPress AI connector: '' lets WordPress choose; otherwise "provider|model" from the list.
+		// The list itself is not read here (it can cost requests); a model the connector no longer
+		// offers is simply not preferred when a suggestion is made.
+		$connector_model          = isset( $input['model_wordpress'] ) ? (string) wp_unslash( $input['model_wordpress'] ) : ( isset( $old['model_wordpress'] ) ? (string) $old['model_wordpress'] : '' );
+		$clean['model_wordpress'] = preg_match( AI::CONNECTOR_MODEL_PATTERN, $connector_model ) ? $connector_model : '';
+		delete_transient( AI::CONNECTOR_MODELS );
+
 		foreach ( array_keys( $models ) as $provider ) {
-			$model                        = isset( $input[ 'model_' . $provider ] ) ? (string) $input[ 'model_' . $provider ] : '';
+			$model                         = isset( $input[ 'model_' . $provider ] ) ? (string) $input[ 'model_' . $provider ] : '';
 			$clean[ 'model_' . $provider ] = isset( $models[ $provider ][ $model ] ) ? $model : (string) key( $models[ $provider ] );
+
+			// Advanced: a model ID typed by the owner wins over the list.
+			// Checked as typed (not after stripping tags), so "claude-<b>" is refused, not saved as "claude-".
+			$custom = isset( $input[ 'custom_model_' . $provider ] ) ? strtolower( trim( wp_unslash( (string) $input[ 'custom_model_' . $provider ] ) ) ) : '';
+			if ( '' !== $custom ) {
+				if ( preg_match( AI::MODEL_ID_PATTERN, $custom ) ) {
+					$clean[ 'model_' . $provider ] = $custom;
+				} elseif ( function_exists( 'add_settings_error' ) ) {
+					add_settings_error(
+						AI::OPTION,
+						'arabic_to_lat_ai_model_' . $provider,
+						sprintf(
+							/* translators: %s: the model ID that was typed */
+							__( '"%s" is not a valid model ID, so the model chosen in the list is used. A model ID has only lowercase letters, digits, dots and hyphens, for example claude-sonnet-5-5.', 'arabic-to-lat' ),
+							esc_html( wp_html_excerpt( $custom, 70, '…' ) )
+						)
+					);
+				}
+			}
 
 			$entered = isset( $input[ 'key_' . $provider ] ) ? trim( sanitize_text_field( wp_unslash( (string) $input[ 'key_' . $provider ] ) ) ) : '';
 			if ( ! empty( $input[ 'remove_key_' . $provider ] ) ) {
@@ -91,6 +117,86 @@ final class AI_Admin {
 	}
 
 	/**
+	 * The model list for the WordPress AI connector: "Let WordPress choose", then
+	 * every text model the configured connectors offer, grouped by provider.
+	 *
+	 * @param string $current Saved "provider|model", or ''.
+	 */
+	private static function render_connector_models( $current ) {
+		$option = AI::OPTION;
+		$groups = array();
+		foreach ( AI::connector_models() as $model ) {
+			$groups[ $model['provider_name'] ][ $model['provider'] . '|' . $model['id'] ] = $model['name'] . ' — ' . AI::price_label( $model['id'] );
+		}
+		$listed = false;
+		foreach ( $groups as $choices ) {
+			$listed = $listed || isset( $choices[ $current ] );
+		}
+		?>
+		<p style="margin:6px 0 0 24px">
+			<label><?php esc_html_e( 'Model', 'arabic-to-lat' ); ?>
+				<select name="<?php echo esc_attr( $option . '[model_wordpress]' ); ?>">
+					<option value="" <?php selected( $current, '' ); ?>><?php esc_html_e( 'Let WordPress choose', 'arabic-to-lat' ); ?></option>
+					<?php if ( '' !== $current && ! $listed ) : ?>
+						<option value="<?php echo esc_attr( $current ); ?>" selected>
+							<?php
+							/* translators: %s: model ID */
+							echo esc_html( sprintf( __( '%s (not offered by the connectors right now)', 'arabic-to-lat' ), AI::model_id( $current ) ) );
+							?>
+						</option>
+					<?php endif; ?>
+					<?php foreach ( $groups as $provider_name => $choices ) : ?>
+						<optgroup label="<?php echo esc_attr( $provider_name ); ?>">
+							<?php foreach ( $choices as $value => $label ) : ?>
+								<option value="<?php echo esc_attr( $value ); ?>" <?php selected( $current, $value ); ?>><?php echo esc_html( $label ); ?></option>
+							<?php endforeach; ?>
+						</optgroup>
+					<?php endforeach; ?>
+				</select>
+			</label>
+		</p>
+		<p class="description" style="margin:6px 0 0 24px"><?php esc_html_e( 'If the chosen model is no longer available in Settings → Connectors, WordPress uses another one.', 'arabic-to-lat' ); ?></p>
+		<?php
+	}
+
+	/**
+	 * "Estimated cost today: at most $0.17 at Claude Opus 5.5 prices", or '' when
+	 * nothing was used or the model's price is not known.
+	 *
+	 * @param array $settings AI::settings().
+	 */
+	private static function cost_today( array $settings ) {
+		$used  = AI::used_today();
+		$model = AI::model_id( $settings[ 'model_' . $settings['provider'] ] );
+		$cost  = '' !== $model ? AI::cost_per_suggestion( $model ) : null;
+		if ( $used < 1 || null === $cost ) {
+			return '';
+		}
+		$dollars = $used * $cost[1] / 100;
+		return sprintf(
+			/* translators: 1: amount in US dollars, 2: model name or ID */
+			__( 'Estimated cost of today\'s requests: at most $%1$s at %2$s prices.', 'arabic-to-lat' ),
+			number_format_i18n( max( 0.01, $dollars ), 2 ),
+			self::model_name( $model )
+		);
+	}
+
+	/**
+	 * Display name of a model, or its ID when it is not in the list.
+	 *
+	 * @param string $model Model ID.
+	 */
+	private static function model_name( $model ) {
+		$models = AI::models();
+		foreach ( $models as $list ) {
+			if ( isset( $list[ $model ] ) ) {
+				return $list[ $model ];
+			}
+		}
+		return $model;
+	}
+
+	/**
 	 * "Test connection": one real request with a fixed Arabic title, no cache.
 	 */
 	public function handle_test() {
@@ -116,9 +222,10 @@ final class AI_Admin {
 	}
 
 	public function render() {
-		$settings = AI::settings();
-		$models   = AI::models();
-		$option   = AI::OPTION;
+		$settings        = AI::settings();
+		$models          = AI::models();
+		$option          = AI::OPTION;
+		$connector_ready = false;
 		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Read-only display flag.
 		$test = isset( $_GET['arabic_to_lat_ai_tested'] ) ? get_transient( 'arabic_to_lat_ai_test_' . get_current_user_id() ) : false;
 		?>
@@ -165,6 +272,7 @@ final class AI_Admin {
 											esc_html_e( 'AI features are switched off on this site.', 'arabic-to-lat' );
 										} elseif ( AI::WORDPRESS === $settings['provider'] && AI::wordpress_connector_ready() ) {
 											esc_html_e( 'Ready: uses the AI service and key set up in Settings → Connectors. No key needed here.', 'arabic-to-lat' );
+											$connector_ready = true;
 										} elseif ( AI::WORDPRESS === $settings['provider'] ) {
 											printf(
 												/* translators: %s: link to Settings → Connectors */
@@ -176,6 +284,14 @@ final class AI_Admin {
 										}
 										?>
 									</p>
+									<?php
+									if ( $connector_ready ) {
+										self::render_connector_models( $settings['model_wordpress'] );
+									} elseif ( '' !== $settings['model_wordpress'] ) {
+										// Keep the saved choice when the list is not shown.
+										echo '<input type="hidden" name="' . esc_attr( $option . '[model_wordpress]' ) . '" value="' . esc_attr( $settings['model_wordpress'] ) . '">';
+									}
+									?>
 								</div>
 							<?php endif; ?>
 							<?php foreach ( array( 'anthropic' => 'Claude (Anthropic)', 'openai' => 'ChatGPT (OpenAI)' ) as $provider => $label ) : ?>
@@ -185,11 +301,35 @@ final class AI_Admin {
 										<label><?php esc_html_e( 'Model', 'arabic-to-lat' ); ?>
 											<select name="<?php echo esc_attr( $option . '[model_' . $provider . ']' ); ?>">
 												<?php foreach ( $models[ $provider ] as $id => $name ) : ?>
-													<option value="<?php echo esc_attr( $id ); ?>" <?php selected( $settings[ 'model_' . $provider ], $id ); ?>><?php echo esc_html( $name ); ?></option>
+													<option value="<?php echo esc_attr( $id ); ?>" <?php selected( $settings[ 'model_' . $provider ], $id ); ?>><?php echo esc_html( $name . ' — ' . AI::price_label( $id ) ); ?></option>
 												<?php endforeach; ?>
 											</select>
 										</label>
 									</p>
+									<?php $custom = isset( $models[ $provider ][ $settings[ 'model_' . $provider ] ] ) ? '' : $settings[ 'model_' . $provider ]; ?>
+									<details style="margin:6px 0 0 24px" <?php echo '' !== $custom ? 'open' : ''; ?>>
+										<summary><?php esc_html_e( 'Use a model that is not in this list', 'arabic-to-lat' ); ?></summary>
+										<p>
+											<label><?php esc_html_e( 'Model ID', 'arabic-to-lat' ); ?>
+												<input type="text" class="regular-text code" autocomplete="off" spellcheck="false" dir="ltr" name="<?php echo esc_attr( $option . '[custom_model_' . $provider . ']' ); ?>" value="<?php echo esc_attr( $custom ); ?>" placeholder="<?php echo esc_attr( 'openai' === $provider ? 'gpt-6.1-sol' : 'claude-sonnet-5-5' ); ?>">
+											</label>
+										</p>
+										<p class="description">
+											<?php
+											if ( '' !== $custom ) {
+												echo esc_html(
+													sprintf(
+														/* translators: 1: model ID, 2: price per suggestion or "price: see your provider" */
+														__( 'In use: %1$s (%2$s).', 'arabic-to-lat' ),
+														$custom,
+														AI::price_label( $custom )
+													)
+												) . ' ';
+											}
+											esc_html_e( 'For a model released after this version of the plugin. It replaces the model chosen above; leave it empty to use the list. Use "Test connection" after saving to check that your key can use it.', 'arabic-to-lat' );
+											?>
+										</p>
+									</details>
 									<p style="margin:6px 0 0 24px">
 										<?php if ( 'constant' === AI::key_source( $provider ) ) : ?>
 											<?php
@@ -207,6 +347,17 @@ final class AI_Admin {
 									</p>
 								</div>
 							<?php endforeach; ?>
+							<p class="description">
+								<?php
+								printf(
+									/* translators: 1: date of the prices, 2: link to Anthropic's pricing page, 3: link to OpenAI's pricing page */
+									esc_html__( 'Prices are the providers\' list prices on %1$s for one suggestion (about 500 to 1,800 tokens sent, a short answer back) and can change: see %2$s and %3$s. You pay the provider; the plugin is free.', 'arabic-to-lat' ),
+									esc_html( date_i18n( get_option( 'date_format' ), strtotime( AI::PRICES_DATE . ' 12:00:00' ) ) ),
+									'<a href="https://platform.claude.com/docs/en/about-claude/pricing" target="_blank" rel="noopener noreferrer">' . esc_html__( 'Anthropic pricing', 'arabic-to-lat' ) . '</a>',
+									'<a href="https://developers.openai.com/api/docs/pricing" target="_blank" rel="noopener noreferrer">' . esc_html__( 'OpenAI pricing', 'arabic-to-lat' ) . '</a>'
+								);
+								?>
+							</p>
 							<p class="description">
 								<?php
 								echo esc_html(
@@ -236,6 +387,10 @@ final class AI_Admin {
 						<?php
 						/* translators: %d: requests used today */
 						echo esc_html( sprintf( __( 'requests per day (0 = no limit). Used today: %d. Repeated requests for the same post are answered from a cache and are free.', 'arabic-to-lat' ), AI::used_today() ) );
+						$estimate = self::cost_today( $settings );
+						if ( '' !== $estimate ) {
+							echo '<br><span class="description">' . esc_html( $estimate ) . '</span>';
+						}
 						?>
 					</td>
 				</tr>

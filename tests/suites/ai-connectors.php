@@ -151,6 +151,75 @@ t_check( 'K24', 'Suggestion refused with a plain message', $r['code'], 'ai_wordp
 t_check( 'K24', 'Nothing sent', count( $log() ), 0 );
 delete_option( 'arabic_to_lat_test_no_ai' );
 
+// K33: the owner picks the connector's model (N13), or lets WordPress choose.
+$two_models = array(
+	'code' => 200,
+	'body' => array(
+		'data'     => array(
+			array( 'id' => 'claude-opus-5-5', 'type' => 'model', 'display_name' => 'Claude Opus 5.5', 'created_at' => '2026-09-01T00:00:00Z' ),
+			array( 'id' => 'claude-haiku-5-5', 'type' => 'model', 'display_name' => 'Claude Haiku 5.5', 'created_at' => '2026-09-01T00:00:00Z' ),
+		),
+		'has_more' => false,
+	),
+);
+$mock_two = function ( $messages ) use ( $two_models ) {
+	update_option( 'arabic_to_lat_test_ai_mock', array( 'by_url' => array( '/v1/models' => $two_models, '/v1/messages' => $messages ) ), false );
+};
+$sent_model = function ( array $entries ) {
+	foreach ( $entries as $entry ) {
+		if ( false !== strpos( $entry['url'], '/v1/messages' ) ) {
+			return isset( $entry['body']['model'] ) ? $entry['body']['model'] : 'no model';
+		}
+	}
+	return 'no request';
+};
+update_option( $connector_opt, $connector_key );
+$configure();
+delete_transient( AI::CONNECTOR_MODELS );
+$mock_two( $answer( '{"slug":"molokhia-recipe"}' ) );
+$page = t_http( 'wp-admin/options-general.php?page=arabic-to-lat', array( 'cookies' => $admin_cookies ) );
+t_true( 'K33', 'Model list offers "Let WordPress choose"', false !== strpos( $page['body'], 'name="arabic_to_lat_ai[model_wordpress]"' ) && false !== strpos( $page['body'], 'Let WordPress choose' ) );
+preg_match_all( '/<option value="([^"]*\|[^"]*)"[^>]*>([^<]*)</', $page['body'], $found );
+$listed = array_map( 'trim', array_combine( $found[1], $found[2] ) );
+ksort( $listed );
+t_check( 'K33', "Connector's models listed with their price", $listed, array( 'anthropic|claude-haiku-5-5' => 'Claude Haiku 5.5 — under 0.05¢ per suggestion', 'anthropic|claude-opus-5-5' => 'Claude Opus 5.5 — 0.6–1.7¢ per suggestion' ) );
+$log();
+
+$admin = new ArabicToLat\AI_Admin();
+$base  = array( 'arabic_to_lat_ai_form' => '1', 'enabled' => '1', 'provider' => 'wordpress' );
+t_check( 'K33', 'Form saves the chosen connector model', $admin->sanitize( array_merge( $base, array( 'model_wordpress' => 'anthropic|claude-haiku-5-5' ) ) )['model_wordpress'], 'anthropic|claude-haiku-5-5' );
+t_check( 'K33', 'Form: "Let WordPress choose" saves empty', $admin->sanitize( array_merge( $base, array( 'model_wordpress' => '' ) ) )['model_wordpress'], '' );
+foreach ( array( 'claude-haiku-5-5', 'anthropic|', '|claude', 'anthropic|bad model', 'Anthropic Inc|x', 'a|<script>' ) as $bad ) {
+	t_check( 'K33', "Form rejects connector model \"$bad\"", $admin->sanitize( array_merge( $base, array( 'model_wordpress' => $bad ) ) )['model_wordpress'], '' );
+}
+
+$configure();
+$r       = $suggest( 'طبخة ملوخية اختيار' );
+$default = $sent_model( $log() );
+t_check( 'K33', '"Let WordPress choose": WordPress picks a model it offers', array( $r['code'], in_array( $default, array( 'claude-opus-5-5', 'claude-haiku-5-5' ), true ) ), array( 'ok:molokhia-recipe', true ) );
+$other = 'claude-opus-5-5' === $default ? 'claude-haiku-5-5' : 'claude-opus-5-5';
+$configure( array( 'model_wordpress' => 'anthropic|' . $other ) );
+$r = $suggest( 'طبخة ملوخية نموذج' );
+t_check( 'K33', 'Suggestion uses the chosen model, not WordPress\'s pick', array( $r['code'], $sent_model( $log() ) ), array( 'ok:molokhia-recipe', $other ) );
+$configure( array( 'model_wordpress' => 'anthropic|claude-retired-1' ) );
+$r = $suggest( 'طبخة ملوخية قديم' );
+t_check( 'K33', 'Model no longer offered: WordPress uses its own pick, the suggestion still works', array( $r['code'], $sent_model( $log() ) ), array( 'ok:molokhia-recipe', $default ) );
+$page = t_http( 'wp-admin/options-general.php?page=arabic-to-lat', array( 'cookies' => $admin_cookies ) );
+t_true( 'K33', 'Settings page says the saved model is not offered right now', false !== strpos( $page['body'], 'claude-retired-1 (not offered by the connectors right now)' ) );
+$log();
+
+// K34: the model list is read on the settings page only, and kept for an hour: the editor never asks for it.
+$configure( array( 'model_wordpress' => 'anthropic|claude-haiku-5-5' ) );
+delete_transient( AI::CONNECTOR_MODELS );
+$editor = t_http( 'wp-admin/post-new.php', array( 'cookies' => $admin_cookies ) );
+t_check( 'K34', 'Editor load with a chosen model sends no request', array( 200 === $editor['code'], count( $log() ) ), array( true, 0 ) );
+t_http( 'wp-admin/options-general.php?page=arabic-to-lat', array( 'cookies' => $admin_cookies ) );
+wp_cache_flush();
+t_check( 'K34', 'Settings page keeps the model list for an hour', is_array( get_transient( AI::CONNECTOR_MODELS ) ) ? count( get_transient( AI::CONNECTOR_MODELS ) ) : 'none', 2 );
+$admin->sanitize( array_merge( $base, array( 'model_wordpress' => '' ) ) );
+t_check( 'K34', 'Saving the AI settings drops the stored list', get_transient( AI::CONNECTOR_MODELS ), false );
+$log();
+
 delete_option( $connector_opt );
 delete_option( AI::OPTION );
 delete_option( 'arabic_to_lat_test_ai_mock' );
