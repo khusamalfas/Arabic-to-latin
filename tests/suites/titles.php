@@ -52,6 +52,10 @@ t_check( 'A9', 'Ligature ﻻ', sanitize_title( 'ﻻ' ), 'la' );
 t_check( 'A9', 'Ligature ﷲ', sanitize_title( 'ﷲ' ), 'allh' );
 t_check( 'A9', 'Word typed in presentation forms (copied from a PDF)', sanitize_title( 'ﻣﺮﺣﺒﺎ ﺑﺎﻟﻌﺎﻟﻢ' ), 'mrhba-balaalm' );
 
+// A9 (S10): Persian and Urdu letter shapes (پ چ ژ ک گ ی) copied from a PDF: same slug as the ordinary letters, with or without intl.
+t_check( 'A9', 'Persian letters in presentation forms', sanitize_title( "\u{FB58}\u{FBFE}\u{FB8F} \u{FB7C}\u{FB94}\u{FB8B}" ), sanitize_title( 'پیک چگژ' ) );
+t_true( 'A9', 'No Arabic-script letter left in a slug from Persian presentation forms', ! preg_match( '/[\x{0600}-\x{06FF}\x{FB50}-\x{FDFF}\x{FE70}-\x{FEFF}]/u', rawurldecode( sanitize_title( "\u{FB56}\u{FB57}\u{FB7A}\u{FB8A}\u{FB8E}\u{FB92}\u{FBFC}\u{FBFF}" ) ) ), sanitize_title( "\u{FB56}\u{FB7A}" ) );
+
 // J3: hosts without the intl extension use a built-in table. Where intl exists, the table must match it exactly.
 if ( class_exists( 'Normalizer' ) ) {
 	$table = ( new ReflectionMethod( 'ArabicToLat\\Transliterator', 'presentation_forms' ) );

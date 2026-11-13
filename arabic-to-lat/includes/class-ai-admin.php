@@ -44,9 +44,9 @@ final class AI_Admin {
 	 */
 	public function sanitize( $input ) {
 		$input = is_array( $input ) ? $input : array();
-		// update_option() from code (tests, WP-CLI) passes the stored shape.
+		// update_option() from code (tests, WP-CLI, an import) passes the stored shape: keep it, field by field.
 		if ( empty( $input['arabic_to_lat_ai_form'] ) ) {
-			return $input;
+			return self::clean_stored( $input );
 		}
 
 		$old    = get_option( AI::OPTION, array() );
@@ -95,6 +95,45 @@ final class AI_Admin {
 				$clean[ 'key_' . $provider ] = AI::encrypt( $entered );
 			} else {
 				$clean[ 'key_' . $provider ] = isset( $old[ 'key_' . $provider ] ) ? (string) $old[ 'key_' . $provider ] : '';
+			}
+		}
+		return $clean;
+	}
+
+	/**
+	 * The stored shape, checked field by field: known keys only, each with its
+	 * type and allowed values. Stored API keys must look like this plugin's own
+	 * encrypted ("v1:") or plain-fallback ("p:") form, so a raw key or markup
+	 * cannot be planted in the option.
+	 *
+	 * @param array $input Stored shape.
+	 */
+	private static function clean_stored( array $input ) {
+		$models = AI::models();
+		$clean  = array();
+		if ( isset( $input['enabled'] ) ) {
+			$clean['enabled'] = ! empty( $input['enabled'] );
+		}
+		if ( isset( $input['provider'] ) ) {
+			$clean['provider'] = self::clean_provider( (string) $input['provider'], $models );
+		}
+		if ( isset( $input['style'] ) ) {
+			$clean['style'] = 'translate' === $input['style'] ? 'translate' : 'describe';
+		}
+		if ( isset( $input['daily_limit'] ) ) {
+			$clean['daily_limit'] = min( 10000, max( 0, (int) $input['daily_limit'] ) );
+		}
+		if ( isset( $input['model_wordpress'] ) && is_string( $input['model_wordpress'] ) && preg_match( AI::CONNECTOR_MODEL_PATTERN, $input['model_wordpress'] ) ) {
+			$clean['model_wordpress'] = $input['model_wordpress'];
+		}
+		foreach ( array_keys( $models ) as $provider ) {
+			$model = isset( $input[ 'model_' . $provider ] ) && is_string( $input[ 'model_' . $provider ] ) ? $input[ 'model_' . $provider ] : '';
+			if ( isset( $models[ $provider ][ $model ] ) || preg_match( AI::MODEL_ID_PATTERN, $model ) ) {
+				$clean[ 'model_' . $provider ] = $model;
+			}
+			$key = isset( $input[ 'key_' . $provider ] ) && is_string( $input[ 'key_' . $provider ] ) ? $input[ 'key_' . $provider ] : null;
+			if ( '' === $key || ( null !== $key && preg_match( '#^(v1|p):[A-Za-z0-9+/]+={0,2}$#', $key ) ) ) {
+				$clean[ 'key_' . $provider ] = $key;
 			}
 		}
 		return $clean;

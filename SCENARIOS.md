@@ -19,7 +19,7 @@ Every row is an action or input a real site can produce, the behaviour we promis
 | A6 | Only Arabic-Indic digits (`٢٠٢٦`) | Numeric slug handled by WordPress (suffix if it clashes with date archives) | 2×2=4 | `titles.php` | ✅ |
 | A7 | HTML / entities in title (`<b>عنوان</b> &amp; نص`) | Tags and entities stripped, Latin slug | 2×3=6 | `titles.php` | ✅ |
 | A8 | Zero-width joiner, RTL marks, tatweel inside words (`مـــرحبا`) | Invisible characters dropped: `mrhba` | 2×3=6 | `titles.php` | ✅ |
-| A9 | Ligatures / presentation forms (`ﻻ`, `ﷲ`) | Decomposed: `la`, `allh` | 2×2=4 | `titles.php` | ✅ |
+| A9 | Ligatures / presentation forms (`ﻻ`, `ﷲ`) | Decomposed: `la`, `allh` | 2×2=4 | `titles.php` (+ Persian/Urdu shapes پ چ ژ ک گ ی, S10) | ✅ |
 | A10 | Same Arabic title twice | Second gets `-2` | 3×4=12 | `titles.php` | ✅ |
 | A11 | Two different titles that sound alike (`صبر` / `سبر` → `sbr`) | Unique slugs (`sbr`, `sbr-2`), never overwritten | 3×3=9 | `titles.php` | ✅ |
 | A12 | Persian / Urdu mixed into Arabic | All letters converted | 2×3=6 | `titles.php` | ✅ |
@@ -86,6 +86,9 @@ Every row is an action or input a real site can produce, the behaviour we promis
 | E11 | Upgrade from 0.3 (`atl_table` filter in theme) | Filter still applied | 2×1=2 | `settings.php` | ✅ |
 | E13 | Author uploads `evil.پهپ.jpg` (Arabic letters spelling "php" in a middle extension) | Never stored as `evil.php.jpg`: WordPress's own `.php_.` protection applies to the transliterated name (security fix 1.2.1; found in the 2026-11-08 review) | 5×2=10 | `security.php` | ✅ |
 | E14 | Author uploads `／‥／‥／ﻻx.jpg` (full-width slash and dots next to an Arabic ligature; Unicode normalisation turns them into `/` and `..`) | File stays in the uploads folder; no path characters in the name (security fix 1.2.1: path traversal) | 5×3=15 | `security.php` | ✅ |
+| E15 | Settings written from code (WP-CLI, an import, another plugin), not through the form | Checked like the form: custom pairs must have an Arabic left side and a URL-safe right side; AI settings keep known fields only, valid models, keys only in the plugin's encrypted form, limit ≤ 10,000 (S5, 1.2.2) | 2×2=4 | `security.php` | ✅ |
+| E16 | Admin in Arabic (right-to-left) reads the mixed examples (`صورة.jpg → sura.jpg`, `ع = 3`) | Each example keeps left-to-right order inside a direction isolate; checked visually on an Arabic site 2026-11-13 (N15 did not reproduce: the isolates have been there since 1.0) | 2×2=4 | `security.php` | ✅ |
+| E17 | Plugin uninstalled on a multisite network | Settings, AI keys, usage counter and cached suggestions removed on **every** site, not only the main one (S8, 1.2.2) | 2×1=2 | manual: two-site network, 2026-11-13 (old: site 2 kept 5 entries; new: 0) | ✅ manual |
 
 ## F. Redirects from converted URLs
 
