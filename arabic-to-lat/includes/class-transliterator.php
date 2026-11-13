@@ -41,6 +41,12 @@ final class Transliterator {
 	const VOWEL_E = "\u{E002}";
 
 	/**
+	 * Marker for a final ہ (or ه) read as the vowel a, which is how Roman Urdu
+	 * writes it: زندہ is zinda, ہفتہ is hafta.
+	 */
+	const VOWEL_A = "\u{E003}";
+
+	/**
 	 * Single-character map applied after the context rules.
 	 *
 	 * @var array<string,string>
@@ -55,6 +61,15 @@ final class Transliterator {
 	private $phrases = array();
 
 	/**
+	 * Whole words a spelling style knows (Arabic script => Latin), for what no
+	 * letter rule can reach: Urdu writes no short vowels, so اردو is urdu only
+	 * because the word is known.
+	 *
+	 * @var array<string,string>
+	 */
+	private $words = array();
+
+	/**
 	 * Whether the context-sensitive waw / yaa rules apply. A custom entry for
 	 * either letter switches its rule off so the user's choice always wins.
 	 *
@@ -64,6 +79,7 @@ final class Transliterator {
 		'waw'      => true,
 		'yaa'      => true,
 		'he_final' => false,
+		'he_a'     => false,
 	);
 
 	/**
@@ -78,6 +94,9 @@ final class Transliterator {
 		// A preset may also switch a context rule on, which a letter table cannot express.
 		if ( ! empty( $chosen['rules'] ) ) {
 			$this->rules = array_merge( $this->rules, $chosen['rules'] );
+		}
+		if ( ! empty( $chosen['words'] ) ) {
+			$this->words = $chosen['words'];
 		}
 
 		foreach ( $custom as $from => $to ) {
@@ -96,6 +115,9 @@ final class Transliterator {
 				$this->rules['yaa'] = false;
 			} elseif ( 'ه' === $from ) {
 				$this->rules['he_final'] = false;
+				$this->rules['he_a']     = false;
+			} elseif ( 'ہ' === $from ) {
+				$this->rules['he_a'] = false;
 			}
 		}
 
@@ -140,6 +162,10 @@ final class Transliterator {
 			$text = strtr( $text, $this->phrases );
 		}
 
+		if ( $this->words ) {
+			$text = $this->replace_words( $text );
+		}
+
 		$text = $this->apply_context_rules( $text );
 
 		$text = strtr( $text, $this->table );
@@ -151,7 +177,43 @@ final class Transliterator {
 				self::VOWEL_U => 'u',
 				self::VOWEL_I => 'i',
 				self::VOWEL_E => 'e',
+				self::VOWEL_A => 'a',
 			)
+		);
+	}
+
+	/**
+	 * Replaces the style's known words, only where they stand as whole words:
+	 * کراچی is karachi, but کراچیوں is left to the letter rules.
+	 *
+	 * @param string $text Text containing Arabic script.
+	 */
+	private function replace_words( $text ) {
+		static $patterns = array();
+		$key = md5( implode( '|', array_keys( $this->words ) ) );
+		if ( ! isset( $patterns[ $key ] ) ) {
+			$from = array_map( 'strval', array_keys( $this->words ) );
+			// Longest first, so اسلام آباد wins over اسلام.
+			usort(
+				$from,
+				static function ( $a, $b ) {
+					return strlen( $b ) - strlen( $a );
+				}
+			);
+			$edge   = '[\x{0600}-\x{06FF}\x{0750}-\x{077F}\x{08A0}-\x{08FF}]';
+			$quoted = array();
+			foreach ( $from as $word ) {
+				$quoted[] = preg_quote( $word, '/' );
+			}
+			$patterns[ $key ] = '/(?<!' . $edge . ')(?:' . implode( '|', $quoted ) . ')(?!' . $edge . ')/u';
+		}
+		$words = $this->words;
+		return (string) preg_replace_callback(
+			$patterns[ $key ],
+			static function ( $match ) use ( $words ) {
+				return $words[ $match[0] ];
+			},
+			$text
 		);
 	}
 
@@ -199,6 +261,15 @@ final class Transliterator {
 			$text = preg_replace(
 				'/(?<=' . $letter . ')(?<![\x{0622}-\x{0627}\x{0648}' . self::VOWEL_U . self::VOWEL_I . '])\x{0647}(?!' . $letter . ')/u',
 				self::VOWEL_E,
+				$text
+			);
+		}
+
+		if ( $this->rules['he_a'] ) {
+			// Urdu: a word-final ہ (or ه) after a consonant is the vowel a (زندہ → zinda); after a long vowel it keeps its h (راہ → rah).
+			$text = preg_replace(
+				'/(?<=' . $letter . ')(?<![\x{0622}-\x{0627}\x{0648}\x{064A}\x{06CC}' . self::VOWEL_U . self::VOWEL_I . '])[\x{0647}\x{06C1}](?!' . $letter . ')/u',
+				self::VOWEL_A,
 				$text
 			);
 		}
@@ -328,6 +399,97 @@ final class Transliterator {
 					'he_final' => true,
 				),
 			),
+			'urdu'     => array(
+				/*
+				 * Roman Urdu as people type it. See issue #2 on GitHub. Urdu writes
+				 * no short vowels, so a letter table gives ardu for اردو and krachi
+				 * for کراچی: common words and place names are known as whole words,
+				 * and a final ہ after a consonant is the vowel a (زندہ → zinda).
+				 * Everything else follows the standard table.
+				 */
+				'table' => array(),
+				'rules' => array(
+					'he_a' => true,
+				),
+				'words' => self::urdu_words(),
+			),
+		);
+	}
+
+	/**
+	 * Common Urdu words and place names in their usual Roman Urdu spelling.
+	 *
+	 * @return array<string,string>
+	 */
+	private static function urdu_words() {
+		return array(
+			// Places.
+			'پاکستان'    => 'pakistan',
+			'اسلام آباد' => 'islamabad',
+			'کراچی'      => 'karachi',
+			'لاہور'      => 'lahore',
+			'راولپنڈی'   => 'rawalpindi',
+			'پشاور'      => 'peshawar',
+			'کوئٹہ'      => 'quetta',
+			'ملتان'      => 'multan',
+			'فیصل آباد'  => 'faisalabad',
+			'حیدرآباد'   => 'hyderabad',
+			'حیدر آباد'  => 'hyderabad',
+			'سیالکوٹ'    => 'sialkot',
+			'گوجرانوالہ' => 'gujranwala',
+			'پنجاب'      => 'punjab',
+			'سندھ'       => 'sindh',
+			'بلوچستان'   => 'balochistan',
+			'کشمیر'      => 'kashmir',
+			'دہلی'       => 'delhi',
+			'ہندوستان'   => 'hindustan',
+			'بھارت'      => 'bharat',
+			// The language and common words whose short vowels decide the reading.
+			'اردو'       => 'urdu',
+			'انگریزی'    => 'angrezi',
+			'اسلام'      => 'islam',
+			'امید'       => 'umeed',
+			'انسان'      => 'insan',
+			'ایک'        => 'ek',
+			'زبان'       => 'zaban',
+			'زندہ باد'   => 'zindabad',
+			'زندہ'       => 'zinda',
+			'ہفتہ'       => 'hafta',
+			'دن'         => 'din',
+			'کم'         => 'kam',
+			'گھر'        => 'ghar',
+			'قیمت'       => 'qeemat',
+			'کتاب'       => 'kitab',
+			'تعلیم'      => 'taleem',
+			'خوبصورت'    => 'khubsurat',
+			'لڑکی'       => 'larki',
+			'لڑکا'       => 'larka',
+			'بچوں'       => 'bachon',
+			'کپڑے'       => 'kapray',
+			'چائے'       => 'chai',
+			'نئی'        => 'nai',
+			'نیا'        => 'naya',
+			'ٹماٹر'      => 'tamatar',
+			'ڈاکٹر'      => 'doctor',
+			'اسکول'      => 'school',
+			// Short words that appear in most titles.
+			'ہے'         => 'hai',
+			'ہیں'        => 'hain',
+			'میں'        => 'mein',
+			'نہیں'       => 'nahin',
+			'کیا'        => 'kya',
+			'کیسے'       => 'kaise',
+			'یہ'         => 'yeh',
+			'وہ'         => 'woh',
+			'کو'         => 'ko',
+			'پر'         => 'par',
+			'تک'         => 'tak',
+			'لیے'        => 'liye',
+			'ساتھ'       => 'sath',
+			'بہت'        => 'bohat',
+			'ہم'         => 'hum',
+			'ہمارے'      => 'hamare',
+			'آپ'         => 'aap',
 		);
 	}
 
@@ -341,6 +503,7 @@ final class Transliterator {
 			'maghreb'  => __( 'Maghreb (French spelling)', 'arabic-to-lat' ),
 			'arabizi'  => __( 'Franco-Arabic / Arabizi (chat numbers)', 'arabic-to-lat' ),
 			'persian'  => __( 'Persian (Farsi) spelling', 'arabic-to-lat' ),
+			'urdu'     => __( 'Urdu spelling', 'arabic-to-lat' ),
 		);
 	}
 
@@ -393,6 +556,7 @@ final class Transliterator {
 			self::VOWEL_U => 'u',
 			self::VOWEL_I => 'i',
 			self::VOWEL_E => 'e',
+			self::VOWEL_A => 'a',
 
 			// Persian, Urdu, Kurdish and Maghrebi letters.
 			'پ' => 'p',
