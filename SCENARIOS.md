@@ -89,6 +89,7 @@ Every row is an action or input a real site can produce, the behaviour we promis
 | E15 | Settings written from code (WP-CLI, an import, another plugin), not through the form | Checked like the form: custom pairs must have an Arabic left side and a URL-safe right side; AI settings keep known fields only, valid models, keys only in the plugin's encrypted form, limit ≤ 10,000 (S5, 1.2.2) | 2×2=4 | `security.php` | ✅ |
 | E16 | Admin in Arabic (right-to-left) reads the mixed examples (`صورة.jpg → sura.jpg`, `ع = 3`) | Each example keeps left-to-right order inside a direction isolate; checked visually on an Arabic site 2026-11-13 (N15 did not reproduce: the isolates have been there since 1.0) | 2×2=4 | `security.php` | ✅ |
 | E17 | Plugin uninstalled on a multisite network | Settings, AI keys, usage counter and cached suggestions removed on **every** site, not only the main one (S8, 1.2.2) | 2×1=2 | manual: two-site network, 2026-11-13 (old: site 2 kept 5 entries; new: 0) | ✅ manual |
+| E18 | Urdu site chooses the **Urdu spelling** style (issue #2) | Common words and places as Roman Urdu, whole words only (اردو → urdu, کراچی → karachi, اسلام آباد → islamabad, یہ کیا ہے → yeh-kya-hai); final ہ after a consonant → a (کمرہ → kmra), h after a long vowel (راہ → rah); custom entries win; Standard and the other styles give exactly the slugs they gave before | 3×2=6 | `settings.php` | ✅ |
 
 ## F. Redirects from converted URLs
 

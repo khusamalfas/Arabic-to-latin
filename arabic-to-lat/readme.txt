@@ -34,7 +34,7 @@ Optional: with the AI connector set up in WordPress (Settings → Connectors, Wo
 * **Supports Arabic, Persian (Farsi), Urdu, Kurdish and Maghrebi letters**, Arabic-Indic and Persian digits (٢٠٢٦ → 2026) and diacritics (مُحَمَّد → muhammad).
 * **Handles text pasted from PDFs and Word**: Arabic letter shapes and ligatures such as ﻻ and ﷲ are read as ordinary letters, also on servers without the PHP intl extension.
 * **Readable results**: و and ي become the vowels u and i inside words, so سعيد becomes *said*, not *sayd*, and يوسف becomes *yusf*.
-* **Regional spelling styles**: Standard, Egyptian (جمال → *gmal*), Maghreb / French (شكور → *chkour*, وجدة → *oujda*), Franco-Arabic / Arabizi chat numbers (حبيبي → *7bibi*) or **Persian (Farsi)**, which reads the letters the Persian way: خانه → *khane* not *khanh*, وردپرس → *vrdprs*, قیمت → *ghimt*, while ماه stays *mah*.
+* **Regional spelling styles**: Standard, Egyptian (جمال → *gmal*), Maghreb / French (شكور → *chkour*, وجدة → *oujda*), Franco-Arabic / Arabizi chat numbers (حبيبي → *7bibi*) or **Persian (Farsi)**, which reads the letters the Persian way: خانه → *khane* not *khanh*, وردپرس → *vrdprs*, قیمت → *ghimt*, while ماه stays *mah*, or **Urdu**, which writes common words and places the way Roman Urdu does: اردو زبان → *urdu-zaban*, کراچی → *karachi*, یہ کیا ہے → *yeh-kya-hai*.
 * **Editable table**: override any letter, for example ع = 3 for Franco-Arabic (Arabizi) style, or whole words (محمد = mohammed) from the settings page.
 * **Latin slug preview in the block editor** while you type the title, before the first save.
 * **Optional AI slug suggestions** through WordPress's AI connectors (7.0+) or your own Claude (Anthropic) or ChatGPT (OpenAI) key: an English slug that says what the post is about, the way people search for it (طبخة ملوخية → *molokhia-recipe*), or a translation of the title (*molokhia-dish*). Names, dishes and places stay in their usual spelling. Suggested in the block editor, used only when the author clicks it; cached, with a daily limit. Off by default.
@@ -151,6 +151,8 @@ Yes. Product, category, tag and attribute term slugs are transliterated. Existin
 = Does it support Persian (Farsi) and Urdu? =
 
 Yes: پ چ ژ گ ک ی and the Urdu letters ٹ ڈ ڑ ں ے ہ are included, as are Persian digits.
+
+For Urdu sites, choose the **Urdu spelling** style in Settings → Arabic to Latin. Urdu, like Persian, does not write short vowels, so a letter table alone gives *ardu* for اردو and *krachi* for کراچی. The Urdu style knows about 60 common words and place names as whole words (اردو → *urdu*, لاہور → *lahore*, اسلام آباد → *islamabad*, ہے → *hai*) and writes a final ہ after a consonant as *a* (زندہ → *zinda*). Other words still get the letter-by-letter spelling (بڑا → *bra*). Corrections from Urdu readers are welcome on GitHub (issue #2).
 
 = Does it work with ACF (Advanced Custom Fields)? =
 
