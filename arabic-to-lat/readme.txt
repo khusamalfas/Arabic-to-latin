@@ -2,9 +2,9 @@
 Contributors: 5vlast
 Tags: arabic, slug, permalink, transliteration, persian
 Requires at least: 6.4
-Tested up to: 7.1
+Tested up to: 7.2
 Requires PHP: 7.4
-Stable tag: 1.2.2
+Stable tag: 1.2.3
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -211,6 +211,10 @@ What is sent, and when: the post title and the first 300 words of the post text,
 
 == Changelog ==
 
+= 1.2.3 =
+* Tested with WordPress 7.2, including its new image uploads that resize pictures in the browser: an image named صورة.jpg is still stored as sura.jpg, and every size the browser makes gets the matching Latin name (sura-150x150.jpg).
+* Tested with PHP 8.6. No code changes were needed; existing slugs and file names do not change.
+
 = 1.2.2 =
 * New: choose the AI model with its cost in view. Each Claude and ChatGPT model in Settings → Arabic to Latin shows what one suggestion costs (for example Claude Haiku 5.5: under 0.05 cent; GPT-6 Astra: 1.5 to 4.3 cents), with the date of the prices and links to both pricing pages. Under the daily limit, an estimate of what today's requests cost at most.
 * New: with the WordPress AI connector (7.0+), pick one of the models it offers, or let WordPress choose as before. If that model is no longer available, WordPress uses another one instead of failing.
@@ -274,6 +278,9 @@ What is sent, and when: the post title and the first 300 words of the post text,
 * Initial release.
 
 == Upgrade Notice ==
+
+= 1.2.3 =
+Tested with WordPress 7.2 and PHP 8.6. No functional changes.
 
 = 1.2.2 =
 Choose the AI model with its cost per suggestion shown, AI suggestions in the classic editor, a new Urdu spelling style, and small hardening fixes. Existing slugs do not change.

@@ -66,6 +66,7 @@ Every row is an action or input a real site can produce, the behaviour we promis
 | D6 | English file name | Untouched | 3×5=15 | `media.php` | ✅ |
 | D7 | File names setting off | Arabic file name kept | 2×2=4 | `media.php` | ✅ |
 | D8 | Image dragged into the **block editor** (REST upload) | Latin file name, Arabic title kept | 3×4=12 | `media.php` | ✅ |
+| D9 | Image uploaded on **WordPress 7.2+** with browser-side processing: original sent without sizes, each size sent under a name the browser builds from the original Arabic name, then finalized | Original and sizes get matching Latin names (`tbq-mlukhiya.jpg`, `tbq-mlukhiya-150x150.jpg`), finalize stores the size, Arabic title kept | 4×3=12 | `media.php` (7.2+) | ✅ |
 
 ## E. Settings and admin actions
 

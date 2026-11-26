@@ -52,6 +52,43 @@ $file = isset( $res['id'] ) ? wp_basename( get_attached_file( $res['id'] ) ) : $
 t_check( 'D8', 'Block editor upload: Latin file name', $file, 'shaar-alshrka.jpg' );
 t_check( 'D8', 'Block editor upload: Arabic title kept', isset( $res['id'] ) ? get_post( $res['id'] )->post_title : null, 'شعار الشركة' );
 
+// D9: WordPress 7.2 resizes images in the browser. The browser uploads the original without sizes,
+// then sends each size under a name it builds from the ORIGINAL (Arabic) file name, then finalizes.
+// The route exists only when the request comes from a secure context (localhost counts), so ask over HTTP.
+$index  = json_decode( t_http( 'wp-json/' )['body'], true );
+$routes = is_array( $index ) && isset( $index['routes'] ) ? $index['routes'] : array();
+if ( isset( $routes['/wp/v2/media/(?P<id>[\d]+)/finalize'] ) ) {
+	$multipart = function ( $name, $fields ) use ( $tmp ) {
+		$boundary = 'atl' . wp_generate_password( 12, false );
+		$body     = '';
+		foreach ( $fields as $key => $value ) {
+			$body .= "--$boundary\r\nContent-Disposition: form-data; name=\"$key\"\r\n\r\n$value\r\n";
+		}
+		$body .= "--$boundary\r\nContent-Disposition: form-data; name=\"file\"; filename=\"$name\"\r\nContent-Type: image/jpeg\r\n\r\n" . file_get_contents( $tmp ) . "\r\n--$boundary--\r\n";
+		return array( $body, "multipart/form-data; boundary=$boundary" );
+	};
+	$rest = function ( $path, $body, $type ) use ( $cookies ) {
+		$r = t_http( 'wp-json/wp/v2/media' . $path, array( 'method' => 'POST', 'cookies' => $cookies, 'body' => $body, 'headers' => array( 'Content-Type' => $type, 'X-WP-Nonce' => wp_create_nonce( 'wp_rest' ) ) ) );
+		return json_decode( $r['body'], true );
+	};
+	wp_set_current_user( $author );
+	list( $body, $type ) = $multipart( 'طبق ملوخية.jpg', array( 'generate_sub_sizes' => 'false', 'convert_format' => 'false' ) );
+	$created             = $rest( '', $body, $type );
+	$id                  = isset( $created['id'] ) ? (int) $created['id'] : 0;
+	list( $body, $type ) = $multipart( 'طبق ملوخية-150x150.jpg', array( 'image_size' => 'thumbnail', 'convert_format' => 'false' ) );
+	$size                = $id ? $rest( "/$id/sideload", $body, $type ) : array();
+	$size_file           = isset( $size['file'] ) ? $size['file'] : '';
+	$final               = $id && $size_file ? $rest( "/$id/finalize", wp_json_encode( array( 'sub_sizes' => array( array( 'image_size' => 'thumbnail', 'file' => $size_file, 'width' => 150, 'height' => 150, 'mime_type' => 'image/jpeg' ) ) ) ), 'application/json' ) : array();
+	wp_set_current_user( 1 );
+	$meta = $id ? wp_get_attachment_metadata( $id ) : array();
+	t_check( 'D9', 'Browser-side processing (7.2): original stored with a Latin name', $id ? wp_basename( get_attached_file( $id ) ) : wp_json_encode( $created ), 'tbq-mlukhiya.jpg' );
+	t_check( 'D9', 'Browser-named size gets the matching Latin name', $size_file, 'tbq-mlukhiya-150x150.jpg' );
+	t_check( 'D9', 'Finalize stores the size in the attachment', isset( $meta['sizes']['thumbnail']['file'] ) ? $meta['sizes']['thumbnail']['file'] : wp_json_encode( $final ), 'tbq-mlukhiya-150x150.jpg' );
+	t_check( 'D9', 'Arabic title kept', $id ? get_post( $id )->post_title : null, 'طبق ملوخية' );
+} else {
+	t_true( 'D9', 'Browser-side image processing not in this WordPress version (7.2+): skipped', true );
+}
+
 t_settings( array( 'files' => false ) );
 t_check( 'D7', 'File names setting off: Arabic kept', sanitize_file_name( 'صورة.jpg' ), 'صورة.jpg' );
 t_reset_settings();
