@@ -122,7 +122,8 @@ build_site() {
 }
 
 start_server() {
-	( cd "$SITE" && exec wp server --host=localhost --port="$PORT" ) > "$LOG" 2>&1 < /dev/null &
+	# PHP's own server with a small router: `wp server` prints WP-CLI's PHP 8.6 deprecations into pages.
+	( cd "$SITE" && exec php -S "localhost:$PORT" -t "$SITE" "$TESTS/lib/router.php" ) > "$LOG" 2>&1 < /dev/null &
 	SERVER_PID=$!
 	for _ in $(seq 1 30); do
 		curl -s -o /dev/null "http://localhost:$PORT/" && return 0
